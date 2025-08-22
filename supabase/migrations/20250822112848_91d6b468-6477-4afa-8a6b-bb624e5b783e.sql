@@ -281,7 +281,7 @@ CREATE TRIGGER update_worker_schedules_updated_at
 
 CREATE TRIGGER update_inventory_items_updated_at
   BEFORE UPDATE ON public.inventory_items
-  FOR EACH ROW EXECUTE FUNCTION public.update_inventory_items_updated_at_column();
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- Create function to handle new user registration
 CREATE OR REPLACE FUNCTION public.handle_new_user()

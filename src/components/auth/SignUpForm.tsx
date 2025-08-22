@@ -35,13 +35,10 @@ export function SignUpForm() {
     }
 
     try {
-      const redirectUrl = `${window.location.origin}/`;
-      
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: redirectUrl,
           data: {
             full_name: fullName,
           },
@@ -49,14 +46,21 @@ export function SignUpForm() {
       });
 
       if (error) {
+        console.error('Signup error:', error);
         setError(error.message);
-      } else {
+      } else if (data.user && !data.session) {
         toast({
           title: "Account created!",
           description: "Please check your email to verify your account.",
         });
+      } else if (data.session) {
+        toast({
+          title: "Welcome!",
+          description: "Your account has been created successfully.",
+        });
       }
     } catch (err) {
+      console.error('Unexpected signup error:', err);
       setError("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);

@@ -21,20 +21,22 @@ export function LoginForm() {
     setError("");
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
+        console.error('Login error:', error);
         setError(error.message);
-      } else {
+      } else if (data.session) {
         toast({
           title: "Welcome back!",
           description: "You have been logged in successfully.",
         });
       }
     } catch (err) {
+      console.error('Unexpected login error:', err);
       setError("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
