@@ -154,9 +154,10 @@ CREATE POLICY "Admins can view all profiles"
 ON public.profiles FOR SELECT
 USING (public.get_user_role(auth.uid()) = 'admin');
 
-CREATE POLICY "Admins can insert profiles"
+-- Allow profile creation for new users (needed for the trigger function)
+CREATE POLICY "Allow profile creation for new users"
 ON public.profiles FOR INSERT
-WITH CHECK (public.get_user_role(auth.uid()) = 'admin');
+WITH CHECK (true);
 
 -- Create policies for customers (admins see all, users see their own)
 CREATE POLICY "Admins can manage all customers"
@@ -293,7 +294,7 @@ BEGIN
     NEW.email,
     COALESCE(NEW.raw_user_meta_data ->> 'full_name', 'User'),
     CASE 
-      WHEN NEW.email = 'admin@salon.com' THEN 'admin'::app_role
+      WHEN NEW.email = 'devzoratech@gmail.com' THEN 'admin'::app_role
       ELSE 'user'::app_role
     END
   );
