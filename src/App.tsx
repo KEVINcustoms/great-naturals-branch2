@@ -17,20 +17,32 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 function AppContent() {
-  const { user, isLoading } = useAuth();
+  const { user, profile, isLoading } = useAuth();
 
+  // Show loading spinner while authentication is being determined
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
       </div>
     );
   }
 
+  // If no user, show login page
   if (!user) {
     return <AuthPage />;
   }
 
+  // If user exists but no profile, something went wrong - show login
+  if (user && !profile) {
+    console.log('User exists but no profile found - redirecting to login');
+    return <AuthPage />;
+  }
+
+  // User and profile exist, show main app
   return (
     <AppLayout>
       <Routes>
