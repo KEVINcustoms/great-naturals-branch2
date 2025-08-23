@@ -7,6 +7,11 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { AuthPage } from "@/components/auth/AuthPage";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
+import Customers from "./pages/Customers";
+import Workers from "./pages/Workers";
+import Inventory from "./pages/Inventory";
+import Alerts from "./pages/Alerts";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,11 +35,11 @@ function AppContent() {
     <AppLayout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/customers" element={<div>Customers page coming soon...</div>} />
-        <Route path="/workers" element={<div>Workers page coming soon...</div>} />
-        <Route path="/inventory" element={<div>Inventory page coming soon...</div>} />
-        <Route path="/alerts" element={<div>Alerts page coming soon...</div>} />
-        <Route path="/settings" element={<div>Settings page coming soon...</div>} />
+        <Route path="/customers" element={<Customers />} />
+        <Route path="/workers" element={<Workers />} />
+        <Route path="/inventory" element={<Inventory />} />
+        <Route path="/alerts" element={<Alerts />} />
+        <Route path="/settings" element={<Settings />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>
