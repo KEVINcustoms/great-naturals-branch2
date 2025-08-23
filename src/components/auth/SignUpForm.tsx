@@ -34,6 +34,11 @@ export function SignUpForm() {
       return;
     }
 
+    if (!fullName.trim()) {
+      setError("Full name is required");
+      setIsLoading(false);
+      return;
+    }
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -42,17 +47,32 @@ export function SignUpForm() {
           data: {
             full_name: fullName,
           },
+          emailRedirectTo: undefined, // Disable email confirmation
         },
       });
 
       if (error) {
         console.error('Signup error:', error);
-        setError(error.message);
+        // Handle specific error cases
+        if (error.message.includes('User already registered')) {
+          setError("An account with this email already exists. Please try logging in instead.");
+        } else if (error.message.includes('Invalid email')) {
+          setError("Please enter a valid email address.");
+        } else if (error.message.includes('Password')) {
+          setError("Password must be at least 6 characters long.");
+        } else {
+          setError(`Signup failed: ${error.message}`);
+        }
       } else if (data.user && !data.session) {
         toast({
           title: "Account created!",
-          description: "Please check your email to verify your account.",
+          description: "Your account has been created successfully. You can now sign in.",
         });
+        // Clear the form
+        setFullName("");
+        setEmail("");
+        setPassword("");
+        setConfirmPassword("");
       } else if (data.session) {
         toast({
           title: "Welcome!",
@@ -61,7 +81,7 @@ export function SignUpForm() {
       }
     } catch (err) {
       console.error('Unexpected signup error:', err);
-      setError("An unexpected error occurred. Please try again.");
+      setError(`An unexpected error occurred: ${err instanceof Error ? err.message : 'Please try again.'}`);
     } finally {
       setIsLoading(false);
     }
