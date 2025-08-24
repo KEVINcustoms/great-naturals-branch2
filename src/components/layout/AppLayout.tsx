@@ -1,7 +1,9 @@
 import { ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
+import { NotificationBadge } from "./NotificationBadge";
 import { useAuth } from "@/hooks/useAuth";
+import { useInventoryAlerts } from "@/hooks/useInventoryAlerts";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -11,6 +13,9 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { profile } = useAuth();
+  
+  // Initialize automated inventory alerts
+  useInventoryAlerts();
 
   return (
     <SidebarProvider>
@@ -27,14 +32,17 @@ export function AppLayout({ children }: AppLayoutProps) {
             </div>
             
             {profile && (
-              <Card className="px-3 py-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">{profile.full_name}</span>
-                  <Badge variant={profile.role === 'admin' ? 'default' : 'secondary'}>
-                    {profile.role}
-                  </Badge>
-                </div>
-              </Card>
+              <div className="flex items-center gap-3">
+                <NotificationBadge />
+                <Card className="px-3 py-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{profile.full_name}</span>
+                    <Badge variant={profile.role === 'admin' ? 'default' : 'secondary'}>
+                      {profile.role}
+                    </Badge>
+                  </div>
+                </Card>
+              </div>
             )}
           </header>
 
