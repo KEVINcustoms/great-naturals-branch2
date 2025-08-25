@@ -222,6 +222,39 @@ export type Database = {
           },
         ]
       }
+      products: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -249,6 +282,96 @@ export type Database = {
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      service_products: {
+        Row: {
+          created_at: string
+          id: string
+          price_per_unit: number
+          product_id: string
+          quantity: number
+          service_id: string
+          total_price: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          price_per_unit?: number
+          product_id: string
+          quantity?: number
+          service_id: string
+          total_price?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          price_per_unit?: number
+          product_id?: string
+          quantity?: number
+          service_id?: string
+          total_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_products_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      services: {
+        Row: {
+          created_at: string
+          created_by: string
+          customer_id: string
+          date_time: string
+          id: string
+          notes: string | null
+          service_category: string
+          service_name: string
+          service_price: number
+          staff_member_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          customer_id: string
+          date_time?: string
+          id?: string
+          notes?: string | null
+          service_category: string
+          service_name: string
+          service_price?: number
+          staff_member_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          customer_id?: string
+          date_time?: string
+          id?: string
+          notes?: string | null
+          service_category?: string
+          service_name?: string
+          service_price?: number
+          staff_member_id?: string | null
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }
