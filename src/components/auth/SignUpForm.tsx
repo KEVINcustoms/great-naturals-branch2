@@ -47,7 +47,7 @@ export function SignUpForm() {
           data: {
             full_name: fullName,
           },
-          emailRedirectTo: undefined, // Disable email confirmation
+          emailRedirectTo: `${window.location.origin}/`,
         },
       });
 

@@ -181,7 +181,7 @@ export default function Customers() {
         <CardHeader>
           <CardTitle>Customer Directory</CardTitle>
           <CardDescription>
-            View and manage all your customers
+            View and manage all your customers and their service history
           </CardDescription>
           <div className="flex items-center space-x-2">
             <Search className="h-4 w-4 text-muted-foreground" />

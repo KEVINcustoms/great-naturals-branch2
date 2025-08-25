@@ -7,6 +7,8 @@ import {
   AlertTriangle,
   Settings,
   LogOut,
+  ClipboardList,
+  ShoppingBag,
 } from "lucide-react";
 import {
   Sidebar,
@@ -25,6 +27,8 @@ import { Button } from "@/components/ui/button";
 
 const menuItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Services", url: "/services", icon: ClipboardList },
+  { title: "Products", url: "/products", icon: ShoppingBag },
   { title: "Customers", url: "/customers", icon: Users },
   { title: "Workers", url: "/workers", icon: UserCheck },
   { title: "Inventory", url: "/inventory", icon: Package },

@@ -7,6 +7,8 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { AuthPage } from "@/components/auth/AuthPage";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
+import Services from "./pages/Services";
+import Products from "./pages/Products";
 import Customers from "./pages/Customers";
 import Workers from "./pages/Workers";
 import Inventory from "./pages/Inventory";
@@ -47,6 +49,8 @@ function AppContent() {
     <AppLayout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/services" element={<Services />} />
+        <Route path="/products" element={<Products />} />
         <Route path="/customers" element={<Customers />} />
         <Route path="/workers" element={<Workers />} />
         <Route path="/inventory" element={<Inventory />} />
