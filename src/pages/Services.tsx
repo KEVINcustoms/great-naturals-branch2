@@ -707,6 +707,94 @@ export default function Services() {
                 </div>
               </div>
 
+              {/* Products Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-gray-700 font-medium">Products Used</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addServiceProduct}
+                    className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Product
+                  </Button>
+                </div>
+                
+                {serviceProducts.length > 0 && (
+                  <div className="space-y-3">
+                    {serviceProducts.map((product, index) => (
+                      <div key={index} className="grid grid-cols-12 gap-3 p-3 bg-gray-50 rounded-lg border">
+                        <div className="col-span-4">
+                          <Select
+                            value={product.product_id}
+                            onValueChange={(value) => updateServiceProduct(index, 'product_id', value)}
+                          >
+                            <SelectTrigger className="border-gray-200 focus:border-blue-400 focus:ring-blue-400">
+                              <SelectValue placeholder="Select product" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {products.map((p) => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  {p.name} - ${p.unit_price}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-2">
+                          <Input
+                            type="number"
+                            min="1"
+                            value={product.quantity}
+                            onChange={(e) => updateServiceProduct(index, 'quantity', parseInt(e.target.value) || 1)}
+                            placeholder="Qty"
+                            className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={product.price_per_unit}
+                            onChange={(e) => updateServiceProduct(index, 'price_per_unit', parseFloat(e.target.value) || 0)}
+                            placeholder="Price"
+                            className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                          />
+                        </div>
+                        <div className="col-span-2 flex items-center">
+                          <span className="text-sm font-medium text-gray-700">
+                            ${(product.quantity * product.price_per_unit).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="col-span-2 flex justify-end">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeServiceProduct(index)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    <div className="flex justify-end">
+                      <div className="text-right">
+                        <div className="text-sm text-gray-600">Total Products:</div>
+                        <div className="text-lg font-semibold text-blue-600">
+                          ${serviceProducts.reduce((total, product) => total + (product.quantity * product.price_per_unit), 0).toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="grid gap-2">
                 <Label htmlFor="notes" className="text-gray-700 font-medium">Notes</Label>
                 <Textarea
