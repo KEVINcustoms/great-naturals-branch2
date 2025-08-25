@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Edit, Trash2, Receipt, Calendar, Users } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Receipt, Calendar, Users, Scissors, DollarSign, Clock, UserCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -101,9 +101,9 @@ export default function Services() {
             workers:staff_member_id (name)
           `)
           .order("created_at", { ascending: false }),
-        supabase.from("customers").select("id, name, email, phone").order("name"),
-        supabase.from("workers").select("id, name").order("name"),
-        supabase.from("products").select("id, name, unit_price").order("name")
+        supabase.from("customers").select("*").order("name"),
+        supabase.from("workers").select("*").order("name"),
+        supabase.from("inventory_items").select("id, name, unit_price").order("name")
       ]);
 
       if (servicesResponse.error) throw servicesResponse.error;
@@ -111,7 +111,13 @@ export default function Services() {
       if (workersResponse.error) throw workersResponse.error;
       if (productsResponse.error) throw productsResponse.error;
 
-      setServices((servicesResponse.data as any) || []);
+      // Transform the services data to match our interface
+      const transformedServices = (servicesResponse.data || []).map(service => ({
+        ...service,
+        customers: typeof service.customers === 'object' && !('error' in service.customers) ? service.customers : null,
+        workers: typeof service.workers === 'object' && !('error' in service.workers) ? service.workers : null
+      }));
+      setServices(transformedServices);
       setCustomers(customersResponse.data || []);
       setWorkers(workersResponse.data || []);
       setProducts(productsResponse.data || []);
@@ -209,7 +215,20 @@ export default function Services() {
 
       setIsDialogOpen(false);
       setEditingService(null);
-      resetForm();
+      setFormData({
+        customer_id: "",
+        customer_name: "",
+        customer_email: "",
+        customer_phone: "",
+        service_name: "",
+        service_category: "",
+        service_price: "",
+        staff_member_id: "",
+        status: "pending",
+        date_time: new Date().toISOString().slice(0, 16),
+        notes: "",
+      });
+      setServiceProducts([]);
       fetchData();
     } catch (error) {
       console.error("Error saving service:", error);
@@ -225,9 +244,12 @@ export default function Services() {
     if (!confirm("Are you sure you want to delete this service?")) return;
 
     try {
-      const { error } = await supabase.from("services").delete().eq("id", id);
+      const { error } = await supabase
+        .from("services")
+        .delete()
+        .eq("id", id);
+
       if (error) throw error;
-      
       toast({ title: "Success", description: "Service deleted successfully" });
       fetchData();
     } catch (error) {
@@ -263,20 +285,32 @@ export default function Services() {
       setEditingService(service);
       setFormData({
         customer_id: service.customer_id,
-        customer_name: "",
-        customer_email: "",
-        customer_phone: "",
+        customer_name: service.customers?.name || "",
+        customer_email: service.customers?.email || "",
+        customer_phone: service.customers?.phone || "",
         service_name: service.service_name,
         service_category: service.service_category,
         service_price: service.service_price.toString(),
         staff_member_id: service.staff_member_id || "",
         status: service.status,
-        date_time: service.date_time.slice(0, 16),
+        date_time: new Date(service.date_time).toISOString().slice(0, 16),
         notes: service.notes || "",
       });
     } else {
       setEditingService(null);
-      resetForm();
+      setFormData({
+        customer_id: "",
+        customer_name: "",
+        customer_email: "",
+        customer_phone: "",
+        service_name: "",
+        service_category: "",
+        service_price: "",
+        staff_member_id: "",
+        status: "pending",
+        date_time: new Date().toISOString().slice(0, 16),
+        notes: "",
+      });
     }
     setIsDialogOpen(true);
   };
@@ -300,99 +334,150 @@ export default function Services() {
     setServiceProducts(serviceProducts.filter((_, i) => i !== index));
   };
 
+
+
   const filteredServices = services.filter((service) =>
     service.service_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    service.customers?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    service.customers?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     service.service_category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const getStatusBadgeVariant = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'completed': return 'default';
-      case 'in_progress': return 'secondary';
-      case 'pending': return 'outline';
-      case 'cancelled': return 'destructive';
-      default: return 'outline';
+      case 'completed':
+        return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200">✓ Completed</Badge>;
+      case 'pending':
+        return <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200">⏳ Pending</Badge>;
+      case 'cancelled':
+        return <Badge className="bg-red-100 text-red-800 border-red-200 hover:bg-red-200">✗ Cancelled</Badge>;
+      case 'in_progress':
+        return <Badge className="bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200">🔄 In Progress</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
     }
+  };
+
+  const getServiceCategoryBadge = (category: string) => {
+    const categoryColors: { [key: string]: string } = {
+      'haircut': 'bg-blue-100 text-blue-800 border-blue-200',
+      'coloring': 'bg-pink-100 text-pink-800 border-pink-200',
+      'styling': 'bg-purple-100 text-purple-800 border-purple-200',
+      'treatment': 'bg-green-100 text-green-800 border-green-200',
+      'extensions': 'bg-orange-100 text-orange-800 border-orange-200',
+      'consultation': 'bg-indigo-100 text-indigo-800 border-indigo-200',
+    };
+    
+    const colorClass = categoryColors[category.toLowerCase()] || 'bg-gray-100 text-gray-800 border-gray-200';
+    return <Badge className={`${colorClass} hover:opacity-80`}>{category}</Badge>;
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Services</h1>
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+            Services
+          </h1>
           <p className="text-muted-foreground">Manage salon services and appointments</p>
         </div>
-        <Button onClick={() => openDialog()}>
+        <Button 
+          onClick={() => openDialog()}
+          className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+        >
           <Plus className="mr-2 h-4 w-4" />
-          Add Service
+          New Service
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Service History</CardTitle>
-          <CardDescription>
-            View and manage all services provided
+      <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-blue-50/50">
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-blue-100">
+          <CardTitle className="text-blue-800">Service Directory</CardTitle>
+          <CardDescription className="text-blue-600">
+            View and manage all salon services and appointments
           </CardDescription>
           <div className="flex items-center space-x-2">
-            <Search className="h-4 w-4 text-muted-foreground" />
+            <Search className="h-4 w-4 text-blue-500" />
             <Input
               placeholder="Search services..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="max-w-sm"
+              className="max-w-sm border-blue-200 focus:border-blue-400 focus:ring-blue-400"
             />
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
           ) : (
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Service</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Staff</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                <TableRow className="bg-gradient-to-r from-blue-50 to-cyan-50 hover:bg-gradient-to-r hover:from-blue-100 hover:to-cyan-100">
+                  <TableHead className="text-blue-800 font-semibold">Customer</TableHead>
+                  <TableHead className="text-blue-800 font-semibold">Service</TableHead>
+                  <TableHead className="text-blue-800 font-semibold">Category</TableHead>
+                  <TableHead className="text-blue-800 font-semibold">Staff</TableHead>
+                  <TableHead className="text-blue-800 font-semibold">Status</TableHead>
+                  <TableHead className="text-blue-800 font-semibold">Date & Time</TableHead>
+                  <TableHead className="text-blue-800 font-semibold">Price</TableHead>
+                  <TableHead className="text-blue-800 font-semibold text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredServices.map((service) => (
-                  <TableRow key={service.id}>
+                  <TableRow key={service.id} className="hover:bg-blue-50/50 transition-colors duration-200">
                     <TableCell>
-                      <div>
-                        <div className="font-medium">{service.service_name}</div>
-                        <div className="text-sm text-muted-foreground">{service.service_category}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{service.customers?.name}</div>
-                        {service.customers?.phone && (
-                          <div className="text-sm text-muted-foreground">{service.customers.phone}</div>
+                      <div className="space-y-1">
+                        <div className="font-medium text-gray-900">{service.customers?.name || 'Unknown'}</div>
+                        {service.customers?.email && (
+                          <div className="text-sm text-gray-500">{service.customers.email}</div>
                         )}
                       </div>
                     </TableCell>
+                    <TableCell className="font-medium text-gray-900">{service.service_name}</TableCell>
                     <TableCell>
-                      {service.workers?.name || (
+                      {getServiceCategoryBadge(service.service_category)}
+                    </TableCell>
+                    <TableCell>
+                      {service.workers ? (
+                        <div className="flex items-center gap-2">
+                          <UserCheck className="h-4 w-4 text-indigo-500" />
+                          <span className="text-sm text-gray-700">{service.workers.name}</span>
+                        </div>
+                      ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
-                    <TableCell>${service.service_price.toFixed(2)}</TableCell>
+                    <TableCell>{getStatusBadge(service.status)}</TableCell>
                     <TableCell>
-                      <Badge variant={getStatusBadgeVariant(service.status)}>
-                        {service.status.replace('_', ' ')}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-blue-500" />
+                        <span className="text-sm text-gray-700">{formatDate(service.date_time)}</span>
+                      </div>
                     </TableCell>
                     <TableCell>
-                      {new Date(service.date_time).toLocaleDateString()}
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-emerald-500" />
+                        <span className="font-semibold text-emerald-700">{formatCurrency(service.service_price)}</span>
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end space-x-2">
@@ -400,6 +485,7 @@ export default function Services() {
                           variant="ghost"
                           size="sm"
                           onClick={() => openReceipt(service)}
+                          className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
                         >
                           <Receipt className="h-4 w-4" />
                         </Button>
@@ -407,6 +493,7 @@ export default function Services() {
                           variant="ghost"
                           size="sm"
                           onClick={() => openDialog(service)}
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -414,6 +501,7 @@ export default function Services() {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDelete(service.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -423,8 +511,12 @@ export default function Services() {
                 ))}
                 {filteredServices.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      No services found
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <div className="flex flex-col items-center gap-2">
+                        <Scissors className="h-12 w-12 text-gray-300" />
+                        <p>No services found</p>
+                        <p className="text-sm">Start by creating your first service</p>
+                      </div>
                     </TableCell>
                   </TableRow>
                 )}
@@ -434,233 +526,83 @@ export default function Services() {
         </CardContent>
       </Card>
 
+      {/* Service Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-md border-0 shadow-2xl">
           <form onSubmit={handleSubmit}>
-            <DialogHeader>
-              <DialogTitle>
+            <DialogHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 p-6 -m-6 mb-6 rounded-t-lg">
+              <DialogTitle className="text-blue-800">
                 {editingService ? "Edit Service" : "Add New Service"}
               </DialogTitle>
-              <DialogDescription>
-                {editingService ? "Update service information" : "Create a new service appointment"}
+              <DialogDescription className="text-blue-600">
+                {editingService ? "Update service information" : "Create a new service for your salon"}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label>Customer</Label>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={!isNewCustomer ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setIsNewCustomer(false)}
-                  >
-                    <Users className="w-4 h-4 mr-2" />
-                    Existing
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={isNewCustomer ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setIsNewCustomer(true)}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    New Customer
-                  </Button>
-                </div>
-                
-                {!isNewCustomer ? (
-                  <Select value={formData.customer_id} onValueChange={(value) => setFormData({...formData, customer_id: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {customers.map((customer) => (
-                        <SelectItem key={customer.id} value={customer.id}>
-                          {customer.name} {customer.phone && `(${customer.phone})`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <div className="grid gap-2">
-                    <Input
-                      placeholder="Customer name *"
-                      value={formData.customer_name}
-                      onChange={(e) => setFormData({...formData, customer_name: e.target.value})}
-                      required
-                    />
-                    <Input
-                      placeholder="Email"
-                      type="email"
-                      value={formData.customer_email}
-                      onChange={(e) => setFormData({...formData, customer_email: e.target.value})}
-                    />
-                    <Input
-                      placeholder="Phone"
-                      value={formData.customer_phone}
-                      onChange={(e) => setFormData({...formData, customer_phone: e.target.value})}
-                    />
-                  </div>
-                )}
+                <Label htmlFor="service_name" className="text-gray-700 font-medium">Service Name *</Label>
+                <Input
+                  id="service_name"
+                  value={formData.service_name}
+                  onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
+                  required
+                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                />
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="service_name">Service Name *</Label>
-                  <Input
-                    id="service_name"
-                    value={formData.service_name}
-                    onChange={(e) => setFormData({...formData, service_name: e.target.value})}
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="service_category">Category *</Label>
-                  <Input
-                    id="service_category"
-                    value={formData.service_category}
-                    onChange={(e) => setFormData({...formData, service_category: e.target.value})}
-                    placeholder="e.g., Styling, Coloring"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="service_price">Price *</Label>
-                  <Input
-                    id="service_price"
-                    type="number"
-                    step="0.01"
-                    value={formData.service_price}
-                    onChange={(e) => setFormData({...formData, service_price: e.target.value})}
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="staff_member_id">Staff Member</Label>
-                  <Select value={formData.staff_member_id} onValueChange={(value) => setFormData({...formData, staff_member_id: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select staff member" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {workers.map((worker) => (
-                        <SelectItem key={worker.id} value={worker.id}>
-                          {worker.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select value={formData.status} onValueChange={(value) => setFormData({...formData, status: value})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="date_time">Date & Time</Label>
-                  <Input
-                    id="date_time"
-                    type="datetime-local"
-                    value={formData.date_time}
-                    onChange={(e) => setFormData({...formData, date_time: e.target.value})}
-                  />
-                </div>
-              </div>
-
-              {!editingService && (
-                <div className="grid gap-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Products Used</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={addServiceProduct}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Product
-                    </Button>
-                  </div>
-                  {serviceProducts.map((sp, index) => (
-                    <div key={index} className="flex gap-2 items-end">
-                      <div className="flex-1">
-                        <Select 
-                          value={sp.product_id} 
-                          onValueChange={(value) => {
-                            const product = products.find(p => p.id === value);
-                            updateServiceProduct(index, 'product_id', value);
-                            if (product) {
-                              updateServiceProduct(index, 'price_per_unit', product.unit_price);
-                            }
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select product" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {products.map((product) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.name} (${product.unit_price})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Input
-                        type="number"
-                        placeholder="Qty"
-                        value={sp.quantity}
-                        onChange={(e) => updateServiceProduct(index, 'quantity', parseInt(e.target.value) || 1)}
-                        className="w-20"
-                        min="1"
-                      />
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="Price"
-                        value={sp.price_per_unit}
-                        onChange={(e) => updateServiceProduct(index, 'price_per_unit', parseFloat(e.target.value) || 0)}
-                        className="w-24"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeServiceProduct(index)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
               <div className="grid gap-2">
-                <Label htmlFor="notes">Notes</Label>
+                <Label htmlFor="service_category" className="text-gray-700 font-medium">Category *</Label>
+                <Input
+                  id="service_category"
+                  value={formData.service_category}
+                  onChange={(e) => setFormData({ ...formData, service_category: e.target.value })}
+                  required
+                  placeholder="e.g., Haircut, Coloring, Styling"
+                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="service_price" className="text-gray-700 font-medium">Price *</Label>
+                <Input
+                  id="service_price"
+                  type="number"
+                  step="0.01"
+                  value={formData.service_price}
+                  onChange={(e) => setFormData({ ...formData, service_price: e.target.value })}
+                  required
+                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="date_time" className="text-gray-700 font-medium">Date & Time *</Label>
+                <Input
+                  id="date_time"
+                  type="datetime-local"
+                  value={formData.date_time}
+                  onChange={(e) => setFormData({ ...formData, date_time: e.target.value })}
+                  required
+                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="notes" className="text-gray-700 font-medium">Notes</Label>
                 <Textarea
                   id="notes"
                   value={formData.notes}
-                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                  placeholder="Additional notes about the service"
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Additional notes about the service..."
                   rows={3}
+                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+            <DialogFooter className="bg-gray-50 p-6 -m-6 mt-6 rounded-b-lg">
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="border-gray-300">
                 Cancel
               </Button>
-              <Button type="submit">
+              <Button 
+                type="submit" 
+                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white"
+              >
                 {editingService ? "Update" : "Create"}
               </Button>
             </DialogFooter>
@@ -668,6 +610,7 @@ export default function Services() {
         </DialogContent>
       </Dialog>
 
+      {/* Receipt Dialog */}
       <ReceiptDialog
         isOpen={isReceiptOpen}
         onClose={() => setIsReceiptOpen(false)}

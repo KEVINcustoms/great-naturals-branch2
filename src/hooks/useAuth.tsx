@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
-import { User, Session } from "@supabase/supabase-js";
+import { User, Session, AuthError, PostgrestError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Profile {
@@ -12,6 +12,10 @@ interface Profile {
   updated_at: string;
 }
 
+interface UserMetadata {
+  full_name?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -22,213 +26,264 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Utility function to safely handle Supabase errors
+const handleSupabaseError = (error: PostgrestError | AuthError | null, operation: string): boolean => {
+  if (!error) return true;
+  
+  console.error(`${operation} failed:`, {
+    code: error.code,
+    message: error.message,
+    details: (error as { details?: string }).details,
+    hint: (error as { hint?: string }).hint
+  });
+  
+  return false;
+};
+
+// Utility function to wait with timeout
+const wait = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
 
-  const fetchProfile = useCallback(async (userId: string, userEmail?: string) => {
+  const createProfile = useCallback(async (userId: string, email: string, fullName?: string): Promise<Profile | null> => {
     const maxRetries = 3;
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`Fetching profile for user: ${userId}, attempt: ${attempt}/${maxRetries}`);
+        const normalizedEmail = email.toLowerCase();
+        const isAdmin = normalizedEmail === 'devzoratech@gmail.com';
+        const displayName = fullName?.trim() || (isAdmin ? 'Admin User' : 'User');
+
+        console.log(`Creating profile for ${normalizedEmail} with role ${isAdmin ? 'admin' : 'user'} (attempt ${attempt}/${maxRetries})`);
+
+        const { data, error } = await supabase
+          .from('profiles')
+          .insert({
+            user_id: userId,
+            email: normalizedEmail,
+            full_name: displayName,
+            role: isAdmin ? 'admin' : 'user'
+          })
+          .select()
+          .single();
+
+        if (handleSupabaseError(error, 'Profile creation')) {
+          console.log('Profile created successfully:', data);
+          return data;
+        }
+
+        // If it's a unique constraint violation, profile might already exist
+        if (error?.code === '23505') {
+          console.log('Profile already exists (race condition), attempting to fetch...');
+          const existingProfile = await fetchProfile(userId);
+          if (existingProfile) return existingProfile;
+        }
+
+        // Wait before retry (exponential backoff)
+        if (attempt < maxRetries) {
+          const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          console.log(`Waiting ${waitTime}ms before retry...`);
+          await wait(waitTime);
+        }
+      } catch (error) {
+        console.error(`Profile creation attempt ${attempt} failed:`, error);
+        if (attempt < maxRetries) {
+          await wait(1000);
+        }
+      }
+    }
+    
+    console.error('Profile creation failed after all retries');
+    return null;
+  }, []);
+
+  const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
+    const maxRetries = 3;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Fetching profile for user ${userId} (attempt ${attempt}/${maxRetries})`);
         
-        const { data: profile, error } = await supabase
+        const { data, error } = await supabase
           .from('profiles')
           .select('*')
           .eq('user_id', userId)
           .single();
-        
-        if (error) {
-          if (error.code === 'PGRST116') {
-            console.log('Profile not found for user:', userId);
-            
-            // If this is not the last attempt, wait and retry
-            if (attempt < maxRetries) {
-              console.log(`Retrying profile fetch in 1 second... (attempt ${attempt + 1}/${maxRetries})`);
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              continue; // Continue to next iteration
-            }
-            
-            // After all retries, profile still doesn't exist - try to create it
-            console.log('Profile missing after all retries - attempting to create profile');
-            if (userEmail) {
-              try {
-                // First, verify the user exists in auth.users (they should since we have a session)
-                console.log('Verifying user exists in auth.users table...');
-                
-                const isAdmin = userEmail === 'devzoratech@gmail.com';
-                console.log(`Creating profile for ${userEmail} with role: ${isAdmin ? 'admin' : 'user'}`);
-                
-                const { data: newProfile, error: createError } = await supabase
-                  .from('profiles')
-                  .insert({
-                    user_id: userId,
-                    email: userEmail,
-                    full_name: isAdmin ? 'Admin User' : 'User',
-                    role: isAdmin ? 'admin' : 'user'
-                  })
-                  .select()
-                  .single();
-                
-                if (createError) {
-                  console.error('Failed to create profile:', createError);
-                  console.error('Create error details:', {
-                    code: createError.code,
-                    message: createError.message,
-                    details: createError.details,
-                    hint: createError.hint
-                  });
-                  
-                  // If it's a unique constraint violation, the profile might have been created by another process
-                  if (createError.code === '23505') {
-                    console.log('Profile already exists (created by another process), retrying fetch...');
-                    // Try to fetch the profile one more time
-                    const { data: existingProfile, error: fetchError } = await supabase
-                      .from('profiles')
-                      .select('*')
-                      .eq('user_id', userId)
-                      .single();
-                    
-                    if (!fetchError && existingProfile) {
-                      console.log('Found existing profile:', existingProfile);
-                      setProfile(existingProfile);
-                    } else {
-                      console.error('Still cannot find profile after creation attempt');
-                      setProfile(null);
-                    }
-                  } else {
-                    setProfile(null);
-                  }
-                } else {
-                  console.log('Profile created successfully:', newProfile);
-                  setProfile(newProfile);
-                }
-              } catch (createErr) {
-                console.error('Error creating profile:', createErr);
-                setProfile(null);
-              }
-            } else {
-              console.log('No user email available - cannot create profile');
-              setProfile(null);
-            }
-            setIsLoading(false);
-            return;
+
+        if (!error && data) {
+          console.log('Profile fetched successfully:', data);
+          return data;
+        }
+
+        if (error?.code === 'PGRST116') {
+          console.log('Profile not found (PGRST116)');
+          return null;
+        }
+
+        // Handle other errors
+        if (!handleSupabaseError(error, 'Profile fetch')) {
+          // Wait before retry
+          if (attempt < maxRetries) {
+            const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+            console.log(`Waiting ${waitTime}ms before retry...`);
+            await wait(waitTime);
           }
-          throw error;
         }
-        
-        // Success - profile found
-        console.log('Profile fetched successfully:', profile);
-        setProfile(profile);
-        setIsLoading(false);
-        return;
-        
       } catch (error) {
-        console.error(`Error fetching profile (attempt ${attempt}/${maxRetries}):`, error);
-        
-        // If this is not the last attempt, wait and retry
+        console.error(`Profile fetch attempt ${attempt} failed:`, error);
         if (attempt < maxRetries) {
-          console.log(`Retrying profile fetch due to error... (attempt ${attempt + 1}/${maxRetries})`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          continue; // Continue to next iteration
+          await wait(1000);
         }
-        
-        // After all retries, still failing
-        console.log('Profile fetch failed after all retries - continuing without profile');
-        setProfile(null);
-        setIsLoading(false);
-        return;
       }
     }
+    
+    console.error('Profile fetch failed after all retries');
+    return null;
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
-    let initialized = false;
+  const ensureProfile = useCallback(async (user: User): Promise<Profile | null> => {
+    try {
+      // Validate user data
+      if (!user.id || !user.email) {
+        console.error('Invalid user data:', { id: user.id, email: user.email });
+        return null;
+      }
 
-    const handleAuthState = async (event: string, session: Session | null) => {
-      if (!mounted) return;
+      console.log('Ensuring profile exists for user:', user.email);
       
-      console.log('Handling auth state:', event, session?.user?.email);
+      // First try to fetch existing profile
+      let profile = await fetchProfile(user.id);
+      
+      if (profile) {
+        console.log('Existing profile found:', profile);
+        return profile;
+      }
+
+      // Profile doesn't exist, create it
+      console.log('No existing profile, creating new one...');
+      profile = await createProfile(user.id, user.email, (user.user_metadata as UserMetadata)?.full_name);
+      
+      if (profile) {
+        console.log('Profile ensured successfully:', profile);
+      } else {
+        console.error('Failed to ensure profile for user:', user.email);
+      }
+      
+      return profile;
+    } catch (error) {
+      console.error('Error in ensureProfile:', error);
+      return null;
+    }
+  }, [fetchProfile, createProfile]);
+
+  const handleAuthStateChange = useCallback(async (event: string, session: Session | null) => {
+    try {
+      console.log('Auth state change:', event, session?.user?.email);
       
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        // Don't set loading to false yet - wait for profile fetch to complete
-        await fetchProfile(session.user.id, session.user.email);
+        setIsLoading(true);
+        setRetryCount(0);
+        
+        const userProfile = await ensureProfile(session.user);
+        
+        if (userProfile) {
+          setProfile(userProfile);
+          console.log('Auth state change completed successfully');
+        } else {
+          console.error('Failed to ensure profile, setting profile to null');
+          setProfile(null);
+        }
+        
+        setIsLoading(false);
       } else {
         setProfile(null);
-        // Only set loading to false when there's no user
+        setIsLoading(false);
+        console.log('User signed out, auth state cleared');
+      }
+    } catch (error) {
+      console.error('Error in handleAuthStateChange:', error);
+      setIsLoading(false);
+      setProfile(null);
+    }
+  }, [ensureProfile]);
+
+  const initializeAuth = useCallback(async () => {
+    try {
+      console.log('Initializing auth state...');
+      
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Error getting initial session:', error);
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log('Initial session retrieved:', session?.user?.email || 'No session');
+      
+      if (session) {
+        await handleAuthStateChange('INITIAL_SESSION', session);
+      } else {
         setIsLoading(false);
       }
-    };
+    } catch (error) {
+      console.error('Error initializing auth:', error);
+      setIsLoading(false);
+    }
+  }, [handleAuthStateChange]);
 
-    // Initialize auth state immediately on mount
-    const initializeAuth = async () => {
+  useEffect(() => {
+    let mounted = true;
+    let authSubscription: { unsubscribe: () => void } | null = null;
+
+    const setupAuth = async () => {
       try {
-        console.log('Initializing auth state...');
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // Initialize auth state
+        await initializeAuth();
         
-        if (error) {
-          console.error('Error getting session:', error);
-          if (mounted) {
-            setIsLoading(false);
+        // Set up auth state listener
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          async (event, session) => {
+            if (mounted) {
+              await handleAuthStateChange(event, session);
+            }
           }
-          return;
-        }
+        );
         
-        console.log('Initial session:', session?.user?.email || 'No session');
-        
-        if (mounted) {
-          initialized = true;
-          await handleAuthState('INITIAL_SESSION', session);
-        }
+        authSubscription = subscription;
       } catch (error) {
-        console.error('Error initializing auth:', error);
-        if (mounted) {
-          setIsLoading(false);
-        }
+        console.error('Error setting up auth:', error);
+        if (mounted) setIsLoading(false);
       }
     };
 
-    // Set up auth state listener for future changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('onAuthStateChange fired:', event, session?.user?.email);
-        
-        // Only handle auth changes after initial setup, or if initialization failed
-        if (initialized || event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
-          await handleAuthState(event, session);
-        }
-      }
-    );
-
-    // Initialize immediately
-    initializeAuth();
-
-    // Add a timeout to ensure loading state is cleared even if auth fails
-    const timeoutId = setTimeout(() => {
-      if (mounted) {
-        console.log('Auth timeout - setting loading to false');
-        setIsLoading(false);
-      }
-    }, 10000); // 10 second timeout (increased for slower connections)
+    setupAuth();
 
     return () => {
       mounted = false;
-      clearTimeout(timeoutId);
-      subscription.unsubscribe();
+      if (authSubscription) {
+        authSubscription.unsubscribe();
+      }
     };
-  }, []); // Empty dependency array - fetchProfile is stable with useCallback
+  }, [initializeAuth, handleAuthStateChange]);
+
   const signOut = async () => {
     try {
+      console.log('Signing out...');
       const { error } = await supabase.auth.signOut();
+      
       if (error) {
-        console.error('Error signing out:', error);
+        console.error('Error during sign out:', error);
+      } else {
+        console.log('Sign out completed successfully');
       }
     } catch (error) {
       console.error('Unexpected error during sign out:', error);

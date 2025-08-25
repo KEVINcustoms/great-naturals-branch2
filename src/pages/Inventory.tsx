@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingUp, TrendingDown } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingUp, TrendingDown, Box, DollarSign, Calendar, Tag, BarChart3 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -178,11 +178,12 @@ export default function Inventory() {
 
     try {
       const quantity = parseInt(transactionData.quantity);
-      const newStock = transactionData.transaction_type === 'in' 
+      const isStockIn = transactionData.transaction_type === 'stock_in';
+      const newStock = isStockIn 
         ? selectedItem.current_stock + quantity 
         : selectedItem.current_stock - quantity;
 
-      if (newStock < 0) {
+      if (!isStockIn && newStock < 0) {
         toast({
           title: "Error",
           description: "Cannot remove more stock than available",
@@ -196,7 +197,7 @@ export default function Inventory() {
         .from("inventory_transactions")
         .insert({
           item_id: selectedItem.id,
-          transaction_type: transactionData.transaction_type,
+          transaction_type: transactionData.transaction_type, // 'stock_in' | 'stock_out'
           quantity: quantity,
           unit_price: parseFloat(transactionData.unit_price) || null,
           total_amount: transactionData.unit_price ? parseFloat(transactionData.unit_price) * quantity : null,
@@ -325,126 +326,184 @@ export default function Inventory() {
     }
   };
 
+  const getStockStatusBadge = (currentStock: number, minStock: number) => {
+    if (currentStock <= 0) {
+      return <Badge className="bg-red-100 text-red-800 border-red-200 hover:bg-red-200">Out of Stock</Badge>;
+    } else if (currentStock <= minStock) {
+      return <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200">Low Stock</Badge>;
+    } else {
+      return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200">In Stock</Badge>;
+    }
+  };
+
+  const getTransactionTypeBadge = (type: string) => {
+    switch (type) {
+      case 'stock_in':
+        return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200">📥 Stock In</Badge>;
+      case 'stock_out':
+        return <Badge className="bg-red-100 text-red-800 border-red-200 hover:bg-red-200">📤 Stock Out</Badge>;
+      case 'adjustment':
+        return <Badge className="bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200">⚖ Adjustment</Badge>;
+      default:
+        return <Badge variant="outline">{type}</Badge>;
+    }
+  };
+
+  const getCategoryBadge = (categoryName: string) => {
+    const categoryColors: { [key: string]: string } = {
+      'hair care': 'bg-purple-100 text-purple-800 border-purple-200',
+      'styling': 'bg-pink-100 text-pink-800 border-pink-200',
+      'tools': 'bg-blue-100 text-blue-800 border-blue-200',
+      'chemicals': 'bg-orange-100 text-orange-800 border-orange-200',
+      'accessories': 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      'supplies': 'bg-green-100 text-green-800 border-green-200',
+    };
+    
+    const colorClass = categoryColors[categoryName.toLowerCase()] || 'bg-gray-100 text-gray-800 border-gray-200';
+    return <Badge className={`${colorClass} hover:opacity-80`}>{categoryName}</Badge>;
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Inventory</h1>
-          <p className="text-muted-foreground">Manage your salon inventory and stock</p>
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+            Inventory
+          </h1>
+          <p className="text-muted-foreground">Manage salon inventory, stock levels, and transactions</p>
         </div>
-        <Button onClick={() => openDialog()}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Item
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => setIsTransactionDialogOpen(true)}
+            className="border-green-200 text-green-700 hover:bg-green-50 hover:border-green-300"
+          >
+            <BarChart3 className="mr-2 h-4 w-4" />
+            Record Transaction
+          </Button>
+          <Button 
+            onClick={() => setIsDialogOpen(true)}
+            className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Item
+          </Button>
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{items.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{lowStockItems.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Expiring Soon</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{expiringSoonItems.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${items.reduce((total, item) => total + (item.current_stock * item.unit_price), 0).toFixed(2)}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="inventory">Inventory Items</TabsTrigger>
-          <TabsTrigger value="transactions">Recent Transactions</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 bg-gray-100 p-1">
+          <TabsTrigger 
+            value="inventory" 
+            className="data-[state=active]:bg-white data-[state=active]:text-green-600 data-[state=active]:shadow-sm"
+          >
+            <Package className="mr-2 h-4 w-4" />
+            Inventory Items
+          </TabsTrigger>
+          <TabsTrigger 
+            value="transactions" 
+            className="data-[state=active]:bg-white data-[state=active]:text-green-600 data-[state=active]:shadow-sm"
+          >
+            <BarChart3 className="mr-2 h-4 w-4" />
+            Transactions
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="inventory">
-          <Card>
-            <CardHeader>
-              <CardTitle>Inventory Items</CardTitle>
-              <CardDescription>
-                Manage your salon products and supplies
+        <TabsContent value="inventory" className="mt-6">
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-green-50/50">
+            <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-100">
+              <CardTitle className="text-green-800">Inventory Management</CardTitle>
+              <CardDescription className="text-green-600">
+                Monitor stock levels, add new items, and manage your inventory
               </CardDescription>
               <div className="flex items-center space-x-2">
-                <Search className="h-4 w-4 text-muted-foreground" />
+                <Search className="h-4 w-4 text-green-500" />
                 <Input
-                  placeholder="Search items..."
+                  placeholder="Search inventory..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="max-w-sm"
+                  className="max-w-sm border-green-200 focus:border-green-400 focus:ring-green-400"
                 />
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Stock</TableHead>
-                      <TableHead>Min/Max</TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Expiry</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                    <TableRow className="bg-gradient-to-r from-green-50 to-emerald-50 hover:bg-gradient-to-r hover:from-green-100 hover:to-emerald-100">
+                      <TableHead className="text-green-800 font-semibold">Item</TableHead>
+                      <TableHead className="text-green-800 font-semibold">Category</TableHead>
+                      <TableHead className="text-green-800 font-semibold">Stock Level</TableHead>
+                      <TableHead className="text-green-800 font-semibold">Status</TableHead>
+                      <TableHead className="text-green-800 font-semibold">Unit Price</TableHead>
+                      <TableHead className="text-green-800 font-semibold">Expiry Date</TableHead>
+                      <TableHead className="text-green-800 font-semibold text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredItems.map((item) => (
-                      <TableRow key={item.id}>
+                    {items.map((item) => (
+                      <TableRow key={item.id} className="hover:bg-green-50/50 transition-colors duration-200">
                         <TableCell>
-                          <div>
-                            <div className="font-medium">{item.name}</div>
+                          <div className="space-y-1">
+                            <div className="font-medium text-gray-900">{item.name}</div>
                             {item.supplier && (
-                              <div className="text-sm text-muted-foreground">{item.supplier}</div>
+                              <div className="text-sm text-gray-500 flex items-center gap-2">
+                                <Tag className="h-3 w-3 text-blue-500" />
+                                {item.supplier}
+                              </div>
                             )}
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="font-medium">{item.current_stock}</div>
+                          {item.category_id ? (
+                            getCategoryBadge(categories.find(c => c.id === item.category_id)?.name || 'Unknown')
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
                         </TableCell>
                         <TableCell>
-                          <div className="text-sm">
-                            Min: {item.min_stock_level} / Max: {item.max_stock_level}
+                          <div className="space-y-1">
+                            <div className="text-sm font-medium text-gray-900">
+                              {item.current_stock} / {item.max_stock_level}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Min: {item.min_stock_level}
+                            </div>
                           </div>
                         </TableCell>
-                        <TableCell>${item.unit_price.toFixed(2)}</TableCell>
-                        <TableCell>{getStockBadge(item)}</TableCell>
+                        <TableCell>
+                          {getStockStatusBadge(item.current_stock, item.min_stock_level)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="h-4 w-4 text-emerald-500" />
+                            <span className="font-semibold text-emerald-700">{formatCurrency(item.unit_price)}</span>
+                          </div>
+                        </TableCell>
                         <TableCell>
                           {item.expiry_date ? (
-                            <div className="text-sm">
-                              {new Date(item.expiry_date).toLocaleDateString()}
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-blue-500" />
+                              <span className="text-sm text-gray-700">{formatDate(item.expiry_date)}</span>
                             </div>
                           ) : (
                             <span className="text-muted-foreground">-</span>
@@ -455,14 +514,22 @@ export default function Inventory() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => openTransactionDialog(item)}
+                              onClick={() => {
+                                setSelectedItem(item);
+                                setIsTransactionDialogOpen(true);
+                              }}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                             >
-                              <TrendingUp className="h-4 w-4" />
+                              <BarChart3 className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => openDialog(item)}
+                              onClick={() => {
+                                setEditingItem(item);
+                                setIsDialogOpen(true);
+                              }}
+                              className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -470,6 +537,7 @@ export default function Inventory() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDelete(item.id)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -477,10 +545,14 @@ export default function Inventory() {
                         </TableCell>
                       </TableRow>
                     ))}
-                    {filteredItems.length === 0 && (
+                    {items.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                          No items found
+                          <div className="flex flex-col items-center gap-2">
+                            <Box className="h-12 w-12 text-gray-300" />
+                            <p>No inventory items found</p>
+                            <p className="text-sm">Start by adding your first inventory item</p>
+                          </div>
                         </TableCell>
                       </TableRow>
                     )}
@@ -491,58 +563,89 @@ export default function Inventory() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="transactions">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Transactions</CardTitle>
-              <CardDescription>
-                View recent stock movements and transactions
+        <TabsContent value="transactions" className="mt-6">
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-blue-50/50">
+            <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-blue-100">
+              <CardTitle className="text-blue-800">Transaction History</CardTitle>
+              <CardDescription className="text-blue-600">
+                View all inventory transactions and stock movements
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Item</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Reason</TableHead>
-                    <TableHead>Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactions.map((transaction) => (
-                    <TableRow key={transaction.id}>
-                      <TableCell className="font-medium">
-                        {transaction.inventory_items?.name}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={transaction.transaction_type === 'in' ? 'default' : 'secondary'}>
-                          {transaction.transaction_type === 'in' ? 'Stock In' : 'Stock Out'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{transaction.quantity}</TableCell>
-                      <TableCell>
-                        {transaction.total_amount ? `$${transaction.total_amount.toFixed(2)}` : '-'}
-                      </TableCell>
-                      <TableCell>
-                        {transaction.reason || '-'}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(transaction.transaction_date).toLocaleDateString()}
-                      </TableCell>
+            <CardContent className="p-6">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gradient-to-r from-blue-50 to-cyan-50 hover:bg-gradient-to-r hover:from-blue-100 hover:to-cyan-100">
+                      <TableHead className="text-blue-800 font-semibold">Date</TableHead>
+                      <TableHead className="text-blue-800 font-semibold">Item</TableHead>
+                      <TableHead className="text-blue-800 font-semibold">Type</TableHead>
+                      <TableHead className="text-blue-800 font-semibold">Quantity</TableHead>
+                      <TableHead className="text-blue-800 font-semibold">Unit Price</TableHead>
+                      <TableHead className="text-blue-800 font-semibold">Total Amount</TableHead>
+                      <TableHead className="text-blue-800 font-semibold">Reason</TableHead>
                     </TableRow>
-                  ))}
-                  {transactions.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        No transactions found
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {transactions.map((transaction) => (
+                      <TableRow key={transaction.id} className="hover:bg-blue-50/50 transition-colors duration-200">
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-blue-500" />
+                            <span className="text-sm text-gray-700">{formatDate(transaction.transaction_date)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium text-gray-900">{transaction.inventory_items.name}</TableCell>
+                        <TableCell>
+                          {getTransactionTypeBadge(transaction.transaction_type)}
+                        </TableCell>
+                        <TableCell className="font-medium text-gray-900">{transaction.quantity}</TableCell>
+                        <TableCell>
+                          {transaction.unit_price ? (
+                            <div className="flex items-center gap-2">
+                              <DollarSign className="h-4 w-4 text-emerald-500" />
+                              <span className="text-sm text-gray-700">{formatCurrency(transaction.unit_price)}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {transaction.total_amount ? (
+                            <div className="flex items-center gap-2">
+                              <DollarSign className="h-4 w-4 text-emerald-500" />
+                              <span className="font-semibold text-emerald-700">{formatCurrency(transaction.total_amount)}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {transaction.reason ? (
+                            <span className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded">{transaction.reason}</span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {transactions.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                          <div className="flex flex-col items-center gap-2">
+                            <BarChart3 className="h-12 w-12 text-gray-300" />
+                            <p>No transactions found</p>
+                            <p className="text-sm">Transactions will appear here once recorded</p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -666,8 +769,8 @@ export default function Inventory() {
                     <SelectValue placeholder="Select transaction type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="in">Stock In</SelectItem>
-                    <SelectItem value="out">Stock Out</SelectItem>
+                    <SelectItem value="stock_in">Stock In</SelectItem>
+                    <SelectItem value="stock_out">Stock Out</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

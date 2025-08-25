@@ -38,10 +38,16 @@ function AppContent() {
     return <AuthPage />;
   }
 
-  // If user exists but no profile, something went wrong - show login
+  // If user exists but no profile yet, keep showing loading until ensured
   if (user && !profile) {
-    console.log('User exists but no profile found - redirecting to login');
-    return <AuthPage />;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Preparing your account...</p>
+        </div>
+      </div>
+    );
   }
 
   // User and profile exist, show main app

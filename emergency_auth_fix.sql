@@ -152,3 +152,7 @@ SELECT
     THEN 'Trigger exists'
     ELSE 'Trigger missing'
   END as status;
+
+
+
+

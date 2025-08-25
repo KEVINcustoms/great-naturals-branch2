@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Save, User, Bell, Database, Shield, Palette } from "lucide-react";
+import { Save, User, Bell, Database, Shield, Palette, Settings as SettingsIcon, Key, Globe, Monitor } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { Badge } from "@/components/ui/badge";
 
 export default function Settings() {
   const [isLoading, setIsLoading] = useState(false);
@@ -146,313 +147,300 @@ export default function Settings() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">
-          Manage your account and application preferences
+      <div className="text-center space-y-2">
+        <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+          Settings
+        </h1>
+        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+          Customize your salon management system preferences and profile settings
         </p>
       </div>
 
-      <Tabs defaultValue="profile" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="system">System</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
+      <Tabs defaultValue="profile" className="w-full">
+        <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1">
+          <TabsTrigger 
+            value="profile" 
+            className="data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
+          >
+            <User className="mr-2 h-4 w-4" />
+            Profile
+          </TabsTrigger>
+          <TabsTrigger 
+            value="preferences" 
+            className="data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm"
+          >
+            <Palette className="mr-2 h-4 w-4" />
+            Preferences
+          </TabsTrigger>
+          <TabsTrigger 
+            value="notifications" 
+            className="data-[state=active]:bg-white data-[state=active]:text-pink-600 data-[state=active]:shadow-sm"
+          >
+            <Bell className="mr-2 h-4 w-4" />
+            Notifications
+          </TabsTrigger>
+          <TabsTrigger 
+            value="system" 
+            className="data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm"
+          >
+            <SettingsIcon className="mr-2 h-4 w-4" />
+            System
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="profile">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Profile Information
+        <TabsContent value="profile" className="mt-6">
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-indigo-50/50">
+            <CardHeader className="bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-indigo-100">
+              <CardTitle className="text-indigo-800 flex items-center gap-2">
+                <User className="h-5 w-5 text-indigo-600" />
+                Profile Settings
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-indigo-600">
                 Update your personal information and account details
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleProfileUpdate} className="space-y-4">
+            <CardContent className="p-6">
+              <form onSubmit={handleProfileUpdate} className="space-y-6">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="full_name">Full Name</Label>
+                    <Label htmlFor="full_name" className="text-gray-700 font-medium">Full Name</Label>
                     <Input
                       id="full_name"
                       value={profileData.full_name}
                       onChange={(e) => setProfileData({ ...profileData, full_name: e.target.value })}
+                      className="border-gray-200 focus:border-indigo-400 focus:ring-indigo-400"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email" className="text-gray-700 font-medium">Email Address</Label>
                     <Input
                       id="email"
                       type="email"
                       value={profileData.email}
                       onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                      className="border-gray-200 focus:border-indigo-400 focus:ring-indigo-400"
                     />
                   </div>
                 </div>
-                
-                <div className="space-y-2">
-                  <Label>Role</Label>
-                  <div className="flex items-center space-x-2">
-                    <span className="px-2 py-1 bg-primary/10 text-primary rounded-md text-sm">
-                      {profile?.role || 'User'}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      Contact an administrator to change your role
-                    </span>
-                  </div>
+                <div className="flex items-center justify-end">
+                  <Button 
+                    type="submit" 
+                    disabled={isLoading}
+                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+                  >
+                    {isLoading ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save Changes
+                      </>
+                    )}
+                  </Button>
                 </div>
-
-                <Button type="submit" disabled={isLoading}>
-                  <Save className="mr-2 h-4 w-4" />
-                  {isLoading ? "Saving..." : "Save Changes"}
-                </Button>
               </form>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="notifications">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
+        <TabsContent value="preferences" className="mt-6">
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-purple-50/50">
+            <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100">
+              <CardTitle className="text-purple-800 flex items-center gap-2">
+                <Palette className="h-5 w-5 text-purple-600" />
+                Appearance & Preferences
+              </CardTitle>
+              <CardDescription className="text-purple-600">
+                Customize the look and feel of your salon management system
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label className="text-gray-700 font-medium">Theme</Label>
+                      <p className="text-sm text-gray-500">Choose your preferred color scheme</p>
+                    </div>
+                    <Select value={preferences.theme} onValueChange={(value) => setPreferences({ ...preferences, theme: value })}>
+                      <SelectTrigger className="w-32 border-purple-200 focus:border-purple-400 focus:ring-purple-400">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="light">Light</SelectItem>
+                        <SelectItem value="dark">Dark</SelectItem>
+                        <SelectItem value="auto">Auto</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label className="text-gray-700 font-medium">Language</Label>
+                      <p className="text-sm text-gray-500">Select your preferred language</p>
+                    </div>
+                    <Select defaultValue="en">
+                      <SelectTrigger className="w-32 border-purple-200 focus:border-purple-400 focus:ring-purple-400">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="en">English</SelectItem>
+                        <SelectItem value="es">Español</SelectItem>
+                        <SelectItem value="fr">Français</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="notifications" className="mt-6">
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-pink-50/50">
+            <CardHeader className="bg-gradient-to-r from-pink-50 to-rose-50 border-b border-pink-100">
+              <CardTitle className="text-pink-800 flex items-center gap-2">
+                <Bell className="h-5 w-5 text-pink-600" />
                 Notification Preferences
               </CardTitle>
-              <CardDescription>
-                Configure how you receive notifications and alerts
+              <CardDescription className="text-pink-600">
+                Configure how and when you receive notifications
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Push Notifications</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Receive notifications in the application
-                    </p>
+            <CardContent className="p-6">
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label className="text-gray-700 font-medium">Push Notifications</Label>
+                      <p className="text-sm text-gray-500">Receive notifications in your browser</p>
+                    </div>
+                    <Switch 
+                      checked={preferences.notifications} 
+                      onCheckedChange={(checked) => setPreferences({ ...preferences, notifications: checked })}
+                    />
                   </div>
-                  <Switch
-                    checked={preferences.notifications}
-                    onCheckedChange={(checked) => 
-                      setPreferences({ ...preferences, notifications: checked })
-                    }
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Email Alerts</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Receive important alerts via email
-                    </p>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label className="text-gray-700 font-medium">Email Alerts</Label>
+                      <p className="text-sm text-gray-500">Get important updates via email</p>
+                    </div>
+                    <Switch 
+                      checked={preferences.email_alerts} 
+                      onCheckedChange={(checked) => setPreferences({ ...preferences, email_alerts: checked })}
+                    />
                   </div>
-                  <Switch
-                    checked={preferences.email_alerts}
-                    onCheckedChange={(checked) => 
-                      setPreferences({ ...preferences, email_alerts: checked })
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Low Stock Alerts</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Get notified when inventory is running low
-                    </p>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label className="text-gray-700 font-medium">Low Stock Alerts</Label>
+                      <p className="text-sm text-gray-500">Notify when inventory is running low</p>
+                    </div>
+                    <Switch 
+                      checked={preferences.low_stock_alerts} 
+                      onCheckedChange={(checked) => setPreferences({ ...preferences, low_stock_alerts: checked })}
+                    />
                   </div>
-                  <Switch
-                    checked={preferences.low_stock_alerts}
-                    onCheckedChange={(checked) => 
-                      setPreferences({ ...preferences, low_stock_alerts: checked })
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Payment Reminders</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Receive reminders about pending payments
-                    </p>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label className="text-gray-700 font-medium">Payment Reminders</Label>
+                      <p className="text-sm text-gray-500">Get reminders for pending payments</p>
+                    </div>
+                    <Switch 
+                      checked={preferences.payment_reminders} 
+                      onCheckedChange={(checked) => setPreferences({ ...preferences, payment_reminders: checked })}
+                    />
                   </div>
-                  <Switch
-                    checked={preferences.payment_reminders}
-                    onCheckedChange={(checked) => 
-                      setPreferences({ ...preferences, payment_reminders: checked })
-                    }
-                  />
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-4">
-                <h4 className="font-medium">Alert Management</h4>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={handleTestAlert}>
-                    <Bell className="mr-2 h-4 w-4" />
-                    Create Test Alert
-                  </Button>
-                  <Button variant="outline" onClick={handleCreateLowStockAlert}>
-                    <Bell className="mr-2 h-4 w-4" />
-                    Generate Low Stock Alerts
-                  </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="system">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Database className="h-5 w-5" />
-                System Preferences
+        <TabsContent value="system" className="mt-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-blue-50/50">
+              <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-blue-100">
+                <CardTitle className="text-blue-800 flex items-center gap-2">
+                  <Database className="h-5 w-5 text-blue-600" />
+                  Database
+                </CardTitle>
+                <CardDescription className="text-blue-600">
+                  System database information and status
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Status</span>
+                    <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Connected</Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Last Backup</span>
+                    <span className="text-sm text-gray-800">2 hours ago</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Size</span>
+                    <span className="text-sm text-gray-800">2.4 GB</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-emerald-50/50">
+              <CardHeader className="bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100">
+                <CardTitle className="text-emerald-800 flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-emerald-600" />
+                  Security
+                </CardTitle>
+                <CardDescription className="text-emerald-600">
+                  Account security and privacy settings
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Two-Factor Auth</span>
+                    <Badge variant="outline" className="text-gray-600">Disabled</Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Last Login</span>
+                    <span className="text-sm text-gray-800">Today, 9:30 AM</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Session Timeout</span>
+                    <span className="text-sm text-gray-800">24 hours</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="mt-6 border-0 shadow-lg bg-gradient-to-br from-white to-orange-50/50">
+            <CardHeader className="bg-gradient-to-r from-orange-50 to-amber-50 border-b border-orange-100">
+              <CardTitle className="text-orange-800 flex items-center gap-2">
+                <Monitor className="h-5 w-5 text-orange-600" />
+                System Information
               </CardTitle>
-              <CardDescription>
-                Configure system-wide settings and preferences
+              <CardDescription className="text-orange-600">
+                Technical details about your salon management system
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
+            <CardContent className="p-6">
+              <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
-                  <Label>Theme</Label>
-                  <Select value={preferences.theme} onValueChange={(value) => setPreferences({ ...preferences, theme: value })}>
-                    <SelectTrigger className="w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="light">Light</SelectItem>
-                      <SelectItem value="dark">Dark</SelectItem>
-                      <SelectItem value="system">System</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-sm font-medium text-gray-700">Version</Label>
+                  <p className="text-sm text-gray-600">v1.2.0</p>
                 </div>
-
-                <Separator />
-
-                <div className="space-y-4">
-                  <h4 className="font-medium">Data Management</h4>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <Card className="p-4">
-                      <h5 className="font-medium mb-2">Database Status</h5>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Real-time updates are enabled for all tables
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                        <span className="text-sm text-green-600">Connected</span>
-                      </div>
-                    </Card>
-                    
-                    <Card className="p-4">
-                      <h5 className="font-medium mb-2">Backup Status</h5>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Automatic backups are managed by Supabase
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-blue-500"></div>
-                        <span className="text-sm text-blue-600">Automated</span>
-                      </div>
-                    </Card>
-                  </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Build Date</Label>
+                  <p className="text-sm text-gray-600">Dec 15, 2024</p>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="security">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Security Settings
-              </CardTitle>
-              <CardDescription>
-                Manage your account security and access permissions
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Card className="p-4">
-                    <h5 className="font-medium mb-2">Authentication</h5>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Secure authentication powered by Supabase
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                      <span className="text-sm text-green-600">Active</span>
-                    </div>
-                  </Card>
-                  
-                  <Card className="p-4">
-                    <h5 className="font-medium mb-2">Row Level Security</h5>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Database access is protected with RLS policies
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                      <span className="text-sm text-green-600">Enabled</span>
-                    </div>
-                  </Card>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-4">
-                  <h4 className="font-medium">Account Actions</h4>
-                  <div className="space-y-2">
-                    <Button variant="outline" disabled>
-                      Change Password
-                      <span className="ml-2 text-xs text-muted-foreground">
-                        (Use Supabase Auth)
-                      </span>
-                    </Button>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Password changes are handled securely through Supabase authentication.
-                    Contact your administrator for password reset options.
-                  </p>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-4">
-                  <h4 className="font-medium">Permission Summary</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center py-2 px-3 bg-muted/50 rounded">
-                      <span className="text-sm">Customers</span>
-                      <span className="text-sm text-muted-foreground">
-                        {profile?.role === 'admin' ? 'Full Access' : 'Own Records Only'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center py-2 px-3 bg-muted/50 rounded">
-                      <span className="text-sm">Workers</span>
-                      <span className="text-sm text-muted-foreground">
-                        {profile?.role === 'admin' ? 'Full Access' : 'Read Only'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center py-2 px-3 bg-muted/50 rounded">
-                      <span className="text-sm">Inventory</span>
-                      <span className="text-sm text-muted-foreground">
-                        {profile?.role === 'admin' ? 'Full Access' : 'Read/Edit Own'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center py-2 px-3 bg-muted/50 rounded">
-                      <span className="text-sm">Alerts</span>
-                      <span className="text-sm text-muted-foreground">Read Only</span>
-                    </div>
-                  </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Environment</Label>
+                  <p className="text-sm text-gray-600">Production</p>
                 </div>
               </div>
             </CardContent>

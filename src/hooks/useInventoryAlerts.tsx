@@ -7,38 +7,53 @@ export function useInventoryAlerts() {
 
   const checkLowStockItems = useCallback(async () => {
     try {
-      // Get items that are at or below minimum stock level
-      const { data: lowStockItems, error } = await supabase
+      // Fetch items and filter client-side because PostgREST cannot compare column to column
+      const { data: items, error } = await supabase
         .from('inventory_items')
-        .select('id, name, current_stock, min_stock_level')
-        .lte('current_stock', 'min_stock_level');
+        .select('id, name, current_stock, min_stock_level');
 
       if (error) throw error;
 
-      if (lowStockItems && lowStockItems.length > 0) {
-        // Check if alerts already exist for these items
-        const { data: existingAlerts, error: alertError } = await supabase
+      const lowStockItems = (items || []).filter(
+        (item) => typeof item.current_stock === 'number' && typeof item.min_stock_level === 'number' && item.current_stock <= item.min_stock_level
+      );
+
+      if (lowStockItems.length > 0) {
+        const cutoffIso = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
+        const entityIds = lowStockItems.map(item => item.id);
+
+        // Fetch recent or unread alerts for these items
+        const { data: recentAlerts, error: alertError } = await supabase
           .from('alerts')
-          .select('entity_id')
+          .select('entity_id, is_read, created_at')
           .eq('type', 'low_stock')
-          .eq('is_read', false)
-          .in('entity_id', lowStockItems.map(item => item.id));
+          .in('entity_id', entityIds)
+          .order('created_at', { ascending: false });
 
         if (alertError) throw alertError;
 
-        const existingEntityIds = existingAlerts?.map(alert => alert.entity_id) || [];
-        
-        // Create alerts for items that don't already have unread low stock alerts
-        const itemsNeedingAlerts = lowStockItems.filter(
-          item => !existingEntityIds.includes(item.id)
-        );
+        // Build a map of the latest alert per entity
+        const latestByEntity = new Map<string, { is_read: boolean; created_at: string }>();
+        (recentAlerts || []).forEach(a => {
+          if (!latestByEntity.has(a.entity_id)) {
+            latestByEntity.set(a.entity_id, { is_read: a.is_read as boolean, created_at: a.created_at as string });
+          }
+        });
+
+        // Create alerts only if no unread exists and last alert is older than 5 days (or none)
+        const itemsNeedingAlerts = lowStockItems.filter(item => {
+          const last = latestByEntity.get(item.id);
+          if (!last) return true;
+          if (last.is_read === false) return false; // unread alert exists
+          return new Date(last.created_at).getTime() < new Date(cutoffIso).getTime();
+        });
 
         if (itemsNeedingAlerts.length > 0) {
           const alerts = itemsNeedingAlerts.map(item => ({
             type: 'low_stock',
             title: 'Low Stock Alert',
             message: `Item "${item.name}" is running low. Current stock: ${item.current_stock}, Minimum: ${item.min_stock_level}`,
-            severity: item.current_stock === 0 ? 'critical' : 'warning',
+            severity: item.current_stock === 0 ? 'error' : 'warning',
             entity_type: 'inventory_item',
             entity_id: item.id,
             expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -73,20 +88,32 @@ export function useInventoryAlerts() {
       if (error) throw error;
 
       if (expiringItems && expiringItems.length > 0) {
-        // Check if alerts already exist
-        const { data: existingAlerts, error: alertError } = await supabase
+        const cutoffIso = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
+        const entityIds = expiringItems.map(item => item.id);
+
+        // Fetch recent or unread alerts for these items
+        const { data: recentAlerts, error: alertError } = await supabase
           .from('alerts')
-          .select('entity_id')
-          .eq('type', 'expiring_stock')
-          .eq('is_read', false)
-          .in('entity_id', expiringItems.map(item => item.id));
+          .select('entity_id, is_read, created_at')
+          .eq('type', 'expiring_soon')
+          .in('entity_id', entityIds)
+          .order('created_at', { ascending: false });
 
         if (alertError) throw alertError;
 
-        const existingEntityIds = existingAlerts?.map(alert => alert.entity_id) || [];
-        const itemsNeedingAlerts = expiringItems.filter(
-          item => !existingEntityIds.includes(item.id)
-        );
+        const latestByEntity = new Map<string, { is_read: boolean; created_at: string }>();
+        (recentAlerts || []).forEach(a => {
+          if (!latestByEntity.has(a.entity_id)) {
+            latestByEntity.set(a.entity_id, { is_read: a.is_read as boolean, created_at: a.created_at as string });
+          }
+        });
+
+        const itemsNeedingAlerts = expiringItems.filter(item => {
+          const last = latestByEntity.get(item.id);
+          if (!last) return true;
+          if (last.is_read === false) return false;
+          return new Date(last.created_at).getTime() < new Date(cutoffIso).getTime();
+        });
 
         if (itemsNeedingAlerts.length > 0) {
           const alerts = itemsNeedingAlerts.map(item => {
@@ -94,7 +121,7 @@ export function useInventoryAlerts() {
             const daysUntilExpiry = Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
             
             return {
-              type: 'expiring_stock',
+              type: 'expiring_soon',
               title: 'Item Expiring Soon',
               message: `Item "${item.name}" expires in ${daysUntilExpiry} days (${item.expiry_date}). Current stock: ${item.current_stock}`,
               severity: daysUntilExpiry <= 7 ? 'error' : 'warning',
@@ -155,9 +182,10 @@ export function useInventoryAlerts() {
     };
   }, [runInventoryChecks]);
 
-  return {
-    runInventoryChecks,
-    checkLowStockItems,
-    checkExpiringItems
-  };
+  // Optionally toast when checks run (debug)
+  useEffect(() => {
+    toast({ title: 'Inventory checks active', description: 'Automated alerts are running in the background.' });
+    // only on first mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 }

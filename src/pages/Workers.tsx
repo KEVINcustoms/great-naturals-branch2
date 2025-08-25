@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Edit, Trash2, Calendar, DollarSign } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Calendar, DollarSign, Users, UserCheck, Mail, Phone, Briefcase, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -169,148 +169,171 @@ export default function Workers() {
     (worker.email && worker.email.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
+  const getRoleBadge = (role: string) => {
+    const roleColors: { [key: string]: string } = {
+      'stylist': 'bg-purple-100 text-purple-800 border-purple-200',
+      'colorist': 'bg-pink-100 text-pink-800 border-pink-200',
+      'receptionist': 'bg-blue-100 text-blue-800 border-blue-200',
+      'manager': 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      'assistant': 'bg-green-100 text-green-800 border-green-200',
+      'trainee': 'bg-orange-100 text-orange-800 border-orange-200',
+    };
+    
+    const colorClass = roleColors[role.toLowerCase()] || 'bg-gray-100 text-gray-800 border-gray-200';
+    return <Badge className={`${colorClass} hover:opacity-80`}>{role}</Badge>;
+  };
+
   const getPaymentStatusBadge = (status: string) => {
     switch (status) {
       case 'paid':
-        return <Badge variant="default" className="bg-green-100 text-green-800">Paid</Badge>;
+        return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200">✓ Paid</Badge>;
       case 'pending':
-        return <Badge variant="secondary">Pending</Badge>;
+        return <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200">⏳ Pending</Badge>;
       case 'overdue':
-        return <Badge variant="destructive">Overdue</Badge>;
+        return <Badge className="bg-red-100 text-red-800 border-red-200 hover:bg-red-200">⚠ Overdue</Badge>;
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return <Badge variant="outline">{status}</Badge>;
     }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Workers</h1>
-          <p className="text-muted-foreground">Manage your salon staff</p>
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+            Workers
+          </h1>
+          <p className="text-muted-foreground">Manage your salon staff and team members</p>
         </div>
-        {profile?.role === 'admin' && (
-          <Button onClick={() => openDialog()}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Worker
-          </Button>
-        )}
+        <Button 
+          onClick={() => setIsDialogOpen(true)}
+          className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Add Worker
+        </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Workers</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{workers.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Salary</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${workers.reduce((total, worker) => total + worker.salary, 0).toLocaleString()}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Payments</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {workers.filter(w => w.payment_status === 'pending' || w.payment_status === 'overdue').length}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Staff Directory</CardTitle>
-          <CardDescription>
-            View and manage all your salon staff
+      <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-emerald-50/50">
+        <CardHeader className="bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100">
+          <CardTitle className="text-emerald-800">Staff Directory</CardTitle>
+          <CardDescription className="text-emerald-600">
+            View and manage all salon workers and their information
           </CardDescription>
           <div className="flex items-center space-x-2">
-            <Search className="h-4 w-4 text-muted-foreground" />
+            <Search className="h-4 w-4 text-emerald-500" />
             <Input
               placeholder="Search workers..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="max-w-sm"
+              className="max-w-sm border-emerald-200 focus:border-emerald-400 focus:ring-emerald-400"
             />
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
             </div>
           ) : (
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Salary</TableHead>
-                  <TableHead>Payment Status</TableHead>
-                  <TableHead>Hire Date</TableHead>
-                  {profile?.role === 'admin' && <TableHead className="text-right">Actions</TableHead>}
+                <TableRow className="bg-gradient-to-r from-emerald-50 to-teal-50 hover:bg-gradient-to-r hover:from-emerald-100 hover:to-teal-100">
+                  <TableHead className="text-emerald-800 font-semibold">Name</TableHead>
+                  <TableHead className="text-emerald-800 font-semibold">Contact</TableHead>
+                  <TableHead className="text-emerald-800 font-semibold">Role</TableHead>
+                  <TableHead className="text-emerald-800 font-semibold">Salary</TableHead>
+                  <TableHead className="text-emerald-800 font-semibold">Payment Status</TableHead>
+                  <TableHead className="text-emerald-800 font-semibold">Hire Date</TableHead>
+                  <TableHead className="text-emerald-800 font-semibold text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredWorkers.map((worker) => (
-                  <TableRow key={worker.id}>
-                    <TableCell className="font-medium">{worker.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{worker.role}</Badge>
-                    </TableCell>
+                {workers.map((worker) => (
+                  <TableRow key={worker.id} className="hover:bg-emerald-50/50 transition-colors duration-200">
+                    <TableCell className="font-medium text-gray-900">{worker.name}</TableCell>
                     <TableCell>
                       <div className="space-y-1">
                         {worker.email && (
-                          <div className="text-sm text-muted-foreground">{worker.email}</div>
+                          <div className="text-sm text-gray-600 flex items-center gap-2">
+                            <Mail className="h-3 w-3 text-blue-500" />
+                            {worker.email}
+                          </div>
                         )}
                         {worker.phone && (
-                          <div className="text-sm">{worker.phone}</div>
+                          <div className="text-sm text-gray-700 flex items-center gap-2">
+                            <Phone className="h-3 w-3 text-green-500" />
+                            {worker.phone}
+                          </div>
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>${worker.salary.toLocaleString()}</TableCell>
-                    <TableCell>{getPaymentStatusBadge(worker.payment_status)}</TableCell>
-                    <TableCell>{new Date(worker.hire_date).toLocaleDateString()}</TableCell>
-                    {profile?.role === 'admin' && (
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openDialog(worker)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(worker.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    )}
+                    <TableCell>
+                      {getRoleBadge(worker.role)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-emerald-500" />
+                        <span className="font-semibold text-emerald-700">{formatCurrency(worker.salary)}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {getPaymentStatusBadge(worker.payment_status)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-emerald-500" />
+                        <span className="text-sm text-gray-700">{formatDate(worker.hire_date)}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditingWorker(worker);
+                            setIsDialogOpen(true);
+                          }}
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(worker.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
-                {filteredWorkers.length === 0 && (
+                {workers.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={profile?.role === 'admin' ? 7 : 6} className="text-center py-8 text-muted-foreground">
-                      No workers found
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <div className="flex flex-col items-center gap-2">
+                        <Users className="h-12 w-12 text-gray-300" />
+                        <p>No workers found</p>
+                        <p className="text-sm">Start by adding your first team member</p>
+                      </div>
                     </TableCell>
                   </TableRow>
                 )}

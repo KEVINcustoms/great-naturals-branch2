@@ -81,3 +81,7 @@ SELECT
   role
 FROM public.profiles 
 WHERE email = 'devzoratech@gmail.com';
+
+
+
+
