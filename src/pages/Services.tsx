@@ -114,8 +114,8 @@ export default function Services() {
       // Transform the services data to match our interface
       const transformedServices = (servicesResponse.data || []).map(service => ({
         ...service,
-        customers: typeof service.customers === 'object' && !('error' in service.customers) ? service.customers : null,
-        workers: typeof service.workers === 'object' && !('error' in service.workers) ? service.workers : null
+        customers: service.customers && typeof service.customers === 'object' && !('error' in (service.customers as object)) ? service.customers : null,
+        workers: service.workers && typeof service.workers === 'object' && !('error' in (service.workers as object)) ? service.workers : null
       }));
       setServices(transformedServices);
       setCustomers(customersResponse.data || []);
@@ -528,7 +528,7 @@ export default function Services() {
 
       {/* Service Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-md border-0 shadow-2xl">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto border-0 shadow-2xl">
           <form onSubmit={handleSubmit}>
             <DialogHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 p-6 -m-6 mb-6 rounded-t-lg">
               <DialogTitle className="text-blue-800">
@@ -538,51 +538,175 @@ export default function Services() {
                 {editingService ? "Update service information" : "Create a new service for your salon"}
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+                        <div className="grid gap-6 py-4">
+              {/* Customer Selection */}
               <div className="grid gap-2">
-                <Label htmlFor="service_name" className="text-gray-700 font-medium">Service Name *</Label>
-                <Input
-                  id="service_name"
-                  value={formData.service_name}
-                  onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
-                  required
-                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-                />
+                <Label className="text-gray-700 font-medium">Customer *</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={isNewCustomer ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setIsNewCustomer(false)}
+                    className={!isNewCustomer ? "bg-blue-600 text-white" : ""}
+                  >
+                    Existing Customer
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={isNewCustomer ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setIsNewCustomer(true)}
+                    className={isNewCustomer ? "bg-blue-600 text-white" : ""}
+                  >
+                    New Customer
+                  </Button>
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="service_category" className="text-gray-700 font-medium">Category *</Label>
-                <Input
-                  id="service_category"
-                  value={formData.service_category}
-                  onChange={(e) => setFormData({ ...formData, service_category: e.target.value })}
-                  required
-                  placeholder="e.g., Haircut, Coloring, Styling"
-                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-                />
+
+              {!isNewCustomer ? (
+                <div className="grid gap-2">
+                  <Label htmlFor="customer_id" className="text-gray-700 font-medium">Select Customer *</Label>
+                  <Select
+                    value={formData.customer_id}
+                    onValueChange={(value) => setFormData({ ...formData, customer_id: value })}
+                    required
+                  >
+                    <SelectTrigger className="border-gray-200 focus:border-blue-400 focus:ring-blue-400">
+                      <SelectValue placeholder="Choose a customer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customers.map((customer) => (
+                        <SelectItem key={customer.id} value={customer.id}>
+                          {customer.name} {customer.email && `(${customer.email})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="customer_name" className="text-gray-700 font-medium">Customer Name *</Label>
+                    <Input
+                      id="customer_name"
+                      value={formData.customer_name}
+                      onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
+                      required
+                      className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="customer_email" className="text-gray-700 font-medium">Customer Email</Label>
+                    <Input
+                      id="customer_email"
+                      type="email"
+                      value={formData.customer_email}
+                      onChange={(e) => setFormData({ ...formData, customer_email: e.target.value })}
+                      className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                    />
+                  </div>
+                  <div className="grid gap-2 col-span-2">
+                    <Label htmlFor="customer_phone" className="text-gray-700 font-medium">Customer Phone</Label>
+                    <Input
+                      id="customer_phone"
+                      value={formData.customer_phone}
+                      onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
+                      className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="service_name" className="text-gray-700 font-medium">Service Name *</Label>
+                  <Input
+                    id="service_name"
+                    value={formData.service_name}
+                    onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
+                    required
+                    className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="service_category" className="text-gray-700 font-medium">Category *</Label>
+                  <Input
+                    id="service_category"
+                    value={formData.service_category}
+                    onChange={(e) => setFormData({ ...formData, service_category: e.target.value })}
+                    required
+                    placeholder="e.g., Haircut, Coloring, Styling"
+                    className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                  />
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="service_price" className="text-gray-700 font-medium">Price *</Label>
-                <Input
-                  id="service_price"
-                  type="number"
-                  step="0.01"
-                  value={formData.service_price}
-                  onChange={(e) => setFormData({ ...formData, service_price: e.target.value })}
-                  required
-                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-                />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="service_price" className="text-gray-700 font-medium">Price *</Label>
+                  <Input
+                    id="service_price"
+                    type="number"
+                    step="0.01"
+                    value={formData.service_price}
+                    onChange={(e) => setFormData({ ...formData, service_price: e.target.value })}
+                    required
+                    className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="staff_member_id" className="text-gray-700 font-medium">Staff Member</Label>
+                  <Select
+                    value={formData.staff_member_id}
+                    onValueChange={(value) => setFormData({ ...formData, staff_member_id: value })}
+                  >
+                    <SelectTrigger className="border-gray-200 focus:border-blue-400 focus:ring-blue-400">
+                      <SelectValue placeholder="Select staff member (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {workers.map((worker) => (
+                        <SelectItem key={worker.id} value={worker.id}>
+                          {worker.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="date_time" className="text-gray-700 font-medium">Date & Time *</Label>
-                <Input
-                  id="date_time"
-                  type="datetime-local"
-                  value={formData.date_time}
-                  onChange={(e) => setFormData({ ...formData, date_time: e.target.value })}
-                  required
-                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-                />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="status" className="text-gray-700 font-medium">Status *</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(value) => setFormData({ ...formData, status: value })}
+                    required
+                  >
+                    <SelectTrigger className="border-gray-200 focus:border-blue-400 focus:ring-blue-400">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="date_time" className="text-gray-700 font-medium">Date & Time *</Label>
+                  <Input
+                    id="date_time"
+                    type="datetime-local"
+                    value={formData.date_time}
+                    onChange={(e) => setFormData({ ...formData, date_time: e.target.value })}
+                    required
+                    className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                  />
+                </div>
               </div>
+
               <div className="grid gap-2">
                 <Label htmlFor="notes" className="text-gray-700 font-medium">Notes</Label>
                 <Textarea
