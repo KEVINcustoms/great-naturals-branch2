@@ -199,7 +199,7 @@ export default function Workers() {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'UGX',
     }).format(amount);
   };
 
@@ -264,7 +264,7 @@ export default function Workers() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {workers.map((worker) => (
+                {filteredWorkers.map((worker) => (
                   <TableRow key={worker.id} className="hover:bg-emerald-50/50 transition-colors duration-200">
                     <TableCell className="font-medium text-gray-900">{worker.name}</TableCell>
                     <TableCell>
@@ -326,7 +326,7 @@ export default function Workers() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {workers.length === 0 && (
+                {filteredWorkers.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       <div className="flex flex-col items-center gap-2">

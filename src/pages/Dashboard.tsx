@@ -25,6 +25,13 @@ interface DashboardStats {
 export default function Dashboard() {
   const { profile } = useAuth();
   const { toast } = useToast();
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'UGX',
+    }).format(amount);
+  };
   const [stats, setStats] = useState<DashboardStats>({
     totalCustomers: 0,
     totalWorkers: 0,
@@ -331,7 +338,7 @@ export default function Dashboard() {
             <div className="space-y-6">
               <div className="text-center p-4 bg-emerald-100 rounded-lg">
                 <div className="text-3xl font-bold text-emerald-900">
-                  {isLoading ? "..." : `$${stats.totalInventoryValue.toFixed(2)}`}
+                  {isLoading ? "..." : formatCurrency(stats.totalInventoryValue)}
                 </div>
                 <p className="text-sm text-emerald-700 font-medium">Current stock value</p>
               </div>
@@ -382,7 +389,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-purple-700">Today's Revenue</p>
-                <p className="text-2xl font-bold text-purple-900">$0.00</p>
+                <p className="text-2xl font-bold text-purple-900">{formatCurrency(0)}</p>
               </div>
               <TrendingUp className="h-8 w-8 text-purple-500" />
             </div>

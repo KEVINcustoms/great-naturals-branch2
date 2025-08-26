@@ -45,7 +45,9 @@ interface Worker {
 interface Product {
   id: string;
   name: string;
-  unit_price: number;
+  unit_price?: number;
+  price?: number;
+  cost?: number;
 }
 
 interface ServiceProduct {
@@ -103,7 +105,7 @@ export default function Services() {
           .order("created_at", { ascending: false }),
         supabase.from("customers").select("*").order("name"),
         supabase.from("workers").select("*").order("name"),
-        supabase.from("inventory_items").select("id, name, unit_price").order("name")
+        supabase.from("products").select("*").order("name")
       ]);
 
       if (servicesResponse.error) throw servicesResponse.error;
@@ -120,7 +122,15 @@ export default function Services() {
       setServices(transformedServices);
       setCustomers(customersResponse.data || []);
       setWorkers(workersResponse.data || []);
-      setProducts(productsResponse.data || []);
+      
+      // Handle products data with better error handling
+      if (productsResponse.data && productsResponse.data.length > 0) {
+        setProducts(productsResponse.data);
+        console.log('Fetched products:', productsResponse.data);
+      } else {
+        console.warn('No products found or products table is empty');
+        setProducts([]);
+      }
     } catch (error) {
       console.error("Error fetching data:", error);
       toast({
@@ -136,6 +146,64 @@ export default function Services() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    console.log('Form submission - Service products:', serviceProducts);
+    console.log('Form submission - Form data:', formData);
+
+    // Validate service products - only validate products that have a product_id selected
+    const productsToValidate = serviceProducts.filter(sp => sp.product_id);
+    const invalidProducts = productsToValidate.filter(sp => 
+      sp.quantity <= 0 || sp.price_per_unit <= 0
+    );
+    
+    // Check if there are products with no product_id selected
+    const productsWithoutSelection = serviceProducts.filter(sp => !sp.product_id);
+    if (productsWithoutSelection.length > 0) {
+      toast({
+        title: "Product Selection Error",
+        description: "Please select a product for all product rows before submitting.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (invalidProducts.length > 0) {
+      console.log('Invalid products:', invalidProducts);
+      console.log('All service products:', serviceProducts);
+      
+      const errorDetails = invalidProducts.map((sp, index) => {
+        if (!sp.product_id) return `Product ${index + 1}: No product selected`;
+        if (sp.quantity <= 0) return `Product ${index + 1}: Invalid quantity (${sp.quantity})`;
+        if (sp.price_per_unit <= 0) return `Product ${index + 1}: Invalid price (${sp.price_per_unit})`;
+        return `Product ${index + 1}: Unknown error`;
+      }).join(', ');
+      
+      toast({
+        title: "Product Validation Error",
+        description: errorDetails,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Additional validation for required fields
+    if (!formData.customer_id && !formData.customer_name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a customer or enter customer details.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.service_name.trim() || !formData.service_category.trim() || !formData.service_price) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required service fields.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       let customerId = formData.customer_id;
@@ -183,6 +251,41 @@ export default function Services() {
           .eq("id", editingService.id);
 
         if (error) throw error;
+
+        // Update service products for existing service
+        if (serviceProducts.length > 0) {
+          // First, delete existing service products
+          const { error: deleteError } = await supabase
+            .from("service_products")
+            .delete()
+            .eq("service_id", editingService.id);
+
+          if (deleteError) throw deleteError;
+
+          // Then insert new service products
+          const serviceProductsData = serviceProducts.map(sp => ({
+            service_id: editingService.id,
+            product_id: sp.product_id,
+            quantity: sp.quantity,
+            price_per_unit: sp.price_per_unit,
+            total_price: sp.quantity * sp.price_per_unit,
+          }));
+
+          const { error: productsError } = await supabase
+            .from("service_products")
+            .insert(serviceProductsData);
+
+          if (productsError) throw productsError;
+        } else {
+          // If no products, delete all existing service products
+          const { error: deleteError } = await supabase
+            .from("service_products")
+            .delete()
+            .eq("service_id", editingService.id);
+
+          if (deleteError) throw deleteError;
+        }
+
         toast({ title: "Success", description: "Service updated successfully" });
       } else {
         const { data: newService, error } = await supabase
@@ -280,7 +383,7 @@ export default function Services() {
     setIsNewCustomer(false);
   };
 
-  const openDialog = (service?: Service) => {
+  const openDialog = async (service?: Service) => {
     if (service) {
       setEditingService(service);
       setFormData({
@@ -296,6 +399,31 @@ export default function Services() {
         date_time: new Date(service.date_time).toISOString().slice(0, 16),
         notes: service.notes || "",
       });
+      
+      // Fetch existing service products
+      try {
+        const { data: existingProducts, error } = await supabase
+          .from("service_products")
+          .select(`
+            *,
+            products (name, unit_price)
+          `)
+          .eq("service_id", service.id);
+
+        if (error) throw error;
+        
+        // Transform the data to match our ServiceProduct interface
+        const transformedProducts = (existingProducts || []).map(sp => ({
+          product_id: sp.product_id,
+          quantity: sp.quantity,
+          price_per_unit: sp.price_per_unit,
+        }));
+        
+        setServiceProducts(transformedProducts);
+      } catch (error) {
+        console.error("Error fetching service products:", error);
+        setServiceProducts([]);
+      }
     } else {
       setEditingService(null);
       setFormData({
@@ -311,6 +439,7 @@ export default function Services() {
         date_time: new Date().toISOString().slice(0, 16),
         notes: "",
       });
+      setServiceProducts([]);
     }
     setIsDialogOpen(true);
   };
@@ -321,7 +450,14 @@ export default function Services() {
   };
 
   const addServiceProduct = () => {
-    setServiceProducts([...serviceProducts, { product_id: "", quantity: 1, price_per_unit: 0 }]);
+    const newProduct = { product_id: "", quantity: 1, price_per_unit: 0 };
+    console.log('Adding new service product:', newProduct);
+    setServiceProducts([...serviceProducts, newProduct]);
+  };
+
+  // Helper function to get product price
+  const getProductPrice = (product: Product) => {
+    return product.unit_price || product.price || product.cost || 0;
   };
 
   const updateServiceProduct = (index: number, field: keyof ServiceProduct, value: string | number) => {
@@ -374,7 +510,7 @@ export default function Services() {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'UGX',
     }).format(amount);
   };
 
@@ -527,7 +663,14 @@ export default function Services() {
       </Card>
 
       {/* Service Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setServiceProducts([]);
+          setEditingService(null);
+          resetForm();
+        }
+        setIsDialogOpen(open);
+      }}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto border-0 shadow-2xl">
           <form onSubmit={handleSubmit}>
             <DialogHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 p-6 -m-6 mb-6 rounded-t-lg">
@@ -619,42 +762,42 @@ export default function Services() {
               )}
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="service_name" className="text-gray-700 font-medium">Service Name *</Label>
-                  <Input
-                    id="service_name"
-                    value={formData.service_name}
-                    onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
-                    required
-                    className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="service_category" className="text-gray-700 font-medium">Category *</Label>
-                  <Input
-                    id="service_category"
-                    value={formData.service_category}
-                    onChange={(e) => setFormData({ ...formData, service_category: e.target.value })}
-                    required
-                    placeholder="e.g., Haircut, Coloring, Styling"
-                    className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-                  />
-                </div>
+              <div className="grid gap-2">
+                <Label htmlFor="service_name" className="text-gray-700 font-medium">Service Name *</Label>
+                <Input
+                  id="service_name"
+                  value={formData.service_name}
+                  onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
+                  required
+                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="service_category" className="text-gray-700 font-medium">Category *</Label>
+                <Input
+                  id="service_category"
+                  value={formData.service_category}
+                  onChange={(e) => setFormData({ ...formData, service_category: e.target.value })}
+                  required
+                  placeholder="e.g., Haircut, Coloring, Styling"
+                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                />
+              </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="service_price" className="text-gray-700 font-medium">Price *</Label>
-                  <Input
-                    id="service_price"
-                    type="number"
-                    step="0.01"
-                    value={formData.service_price}
-                    onChange={(e) => setFormData({ ...formData, service_price: e.target.value })}
-                    required
-                    className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-                  />
-                </div>
+              <div className="grid gap-2">
+                <Label htmlFor="service_price" className="text-gray-700 font-medium">Price *</Label>
+                <Input
+                  id="service_price"
+                  type="number"
+                  step="0.01"
+                  value={formData.service_price}
+                  onChange={(e) => setFormData({ ...formData, service_price: e.target.value })}
+                  required
+                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                />
+              </div>
                 <div className="grid gap-2">
                   <Label htmlFor="staff_member_id" className="text-gray-700 font-medium">Staff Member</Label>
                   <Select
@@ -694,29 +837,37 @@ export default function Services() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="date_time" className="text-gray-700 font-medium">Date & Time *</Label>
-                  <Input
-                    id="date_time"
-                    type="datetime-local"
-                    value={formData.date_time}
-                    onChange={(e) => setFormData({ ...formData, date_time: e.target.value })}
-                    required
-                    className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-                  />
-                </div>
+              <div className="grid gap-2">
+                <Label htmlFor="date_time" className="text-gray-700 font-medium">Date & Time *</Label>
+                <Input
+                  id="date_time"
+                  type="datetime-local"
+                  value={formData.date_time}
+                  onChange={(e) => setFormData({ ...formData, date_time: e.target.value })}
+                  required
+                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                />
+              </div>
               </div>
 
               {/* Products Section */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label className="text-gray-700 font-medium">Products Used</Label>
+                  <div>
+                    <Label className="text-gray-700 font-medium">Products Used</Label>
+                    {products.length === 0 && (
+                      <p className="text-sm text-amber-600 mt-1">
+                        ⚠️ No products available. Please add products in the Products tab first.
+                      </p>
+                    )}
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={addServiceProduct}
-                    className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                    disabled={products.length === 0}
+                    className="text-blue-600 border-blue-300 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Product
@@ -725,22 +876,54 @@ export default function Services() {
                 
                 {serviceProducts.length > 0 && (
                   <div className="space-y-3">
-                    {serviceProducts.map((product, index) => (
-                      <div key={index} className="grid grid-cols-12 gap-3 p-3 bg-gray-50 rounded-lg border">
+                                         {serviceProducts.map((product, index) => (
+                       <div key={index} className={`grid grid-cols-12 gap-3 p-3 rounded-lg border ${
+                         !product.product_id ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'
+                       }`}>
                         <div className="col-span-4">
                           <Select
                             value={product.product_id}
-                            onValueChange={(value) => updateServiceProduct(index, 'product_id', value)}
+                                                         onValueChange={(value) => {
+                               console.log('Product selected:', value);
+                               const selectedProduct = products.find(p => p.id === value);
+                               console.log('Selected product:', selectedProduct);
+                               
+                               if (selectedProduct) {
+                                 const price = getProductPrice(selectedProduct);
+                                 console.log('Setting price:', price);
+                                 
+                                 // Update both product_id and price_per_unit atomically
+                                 const updated = [...serviceProducts];
+                                 updated[index] = {
+                                   ...updated[index],
+                                   product_id: value,
+                                   price_per_unit: price
+                                 };
+                                 setServiceProducts(updated);
+                               } else {
+                                 // Just update the product_id if no product found
+                                 updateServiceProduct(index, 'product_id', value);
+                               }
+                             }}
                           >
                             <SelectTrigger className="border-gray-200 focus:border-blue-400 focus:ring-blue-400">
                               <SelectValue placeholder="Select product" />
                             </SelectTrigger>
                             <SelectContent>
-                              {products.map((p) => (
-                                <SelectItem key={p.id} value={p.id}>
-                                  {p.name} - ${p.unit_price}
+                                                             {products.length > 0 ? (
+                                 products.map((p) => {
+                                   const price = getProductPrice(p);
+                                   return (
+                                     <SelectItem key={p.id} value={p.id}>
+                                                                               {p.name} - {formatCurrency(price)}
+                                     </SelectItem>
+                                   );
+                                 })
+                               ) : (
+                                <SelectItem value="" disabled>
+                                  No products available
                                 </SelectItem>
-                              ))}
+                              )}
                             </SelectContent>
                           </Select>
                         </div>
@@ -765,9 +948,9 @@ export default function Services() {
                           />
                         </div>
                         <div className="col-span-2 flex items-center">
-                          <span className="text-sm font-medium text-gray-700">
-                            ${(product.quantity * product.price_per_unit).toFixed(2)}
-                          </span>
+                                                     <span className="text-sm font-medium text-gray-700">
+                             {formatCurrency(product.quantity * product.price_per_unit)}
+                           </span>
                         </div>
                         <div className="col-span-2 flex justify-end">
                           <Button
@@ -786,9 +969,9 @@ export default function Services() {
                     <div className="flex justify-end">
                       <div className="text-right">
                         <div className="text-sm text-gray-600">Total Products:</div>
-                        <div className="text-lg font-semibold text-blue-600">
-                          ${serviceProducts.reduce((total, product) => total + (product.quantity * product.price_per_unit), 0).toFixed(2)}
-                        </div>
+                                                 <div className="text-lg font-semibold text-blue-600">
+                           {formatCurrency(serviceProducts.reduce((total, product) => total + (product.quantity * product.price_per_unit), 0))}
+                         </div>
                       </div>
                     </div>
                   </div>
@@ -808,7 +991,12 @@ export default function Services() {
               </div>
             </div>
             <DialogFooter className="bg-gray-50 p-6 -m-6 mt-6 rounded-b-lg">
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="border-gray-300">
+              <Button type="button" variant="outline" onClick={() => {
+                setIsDialogOpen(false);
+                setServiceProducts([]);
+                setEditingService(null);
+                resetForm();
+              }} className="border-gray-300">
                 Cancel
               </Button>
               <Button 
@@ -830,4 +1018,587 @@ export default function Services() {
       />
     </div>
   );
+
+  return (
+
+    <div className="space-y-6">
+
+      <div className="flex items-center justify-between">
+
+        <div>
+
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+
+            Services
+
+          </h1>
+
+          <p className="text-muted-foreground">Manage salon services and appointments</p>
+
+        </div>
+
+        <Button 
+
+          onClick={() => openDialog()}
+
+          className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+
+        >
+
+          <Plus className="mr-2 h-4 w-4" />
+
+          New Service
+
+        </Button>
+
+      </div>
+
+
+
+      <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-blue-50/50">
+
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-blue-100">
+
+          <CardTitle className="text-blue-800">Service Directory</CardTitle>
+
+          <CardDescription className="text-blue-600">
+
+            View and manage all salon services and appointments
+
+          </CardDescription>
+
+          <div className="flex items-center space-x-2">
+
+            <Search className="h-4 w-4 text-blue-500" />
+
+            <Input
+
+              placeholder="Search services..."
+
+              value={searchQuery}
+
+              onChange={(e) => setSearchQuery(e.target.value)}
+
+              className="max-w-sm border-blue-200 focus:border-blue-400 focus:ring-blue-400"
+
+            />
+
+          </div>
+
+        </CardHeader>
+
+        <CardContent className="p-6">
+
+          {isLoading ? (
+
+            <div className="flex items-center justify-center py-8">
+
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+
+            </div>
+
+          ) : (
+
+            <Table>
+
+              <TableHeader>
+
+                <TableRow className="bg-gradient-to-r from-blue-50 to-cyan-50 hover:bg-gradient-to-r hover:from-blue-100 hover:to-cyan-100">
+
+                  <TableHead className="text-blue-800 font-semibold">Customer</TableHead>
+
+                  <TableHead className="text-blue-800 font-semibold">Service</TableHead>
+
+                  <TableHead className="text-blue-800 font-semibold">Category</TableHead>
+
+                  <TableHead className="text-blue-800 font-semibold">Staff</TableHead>
+
+                  <TableHead className="text-blue-800 font-semibold">Status</TableHead>
+
+                  <TableHead className="text-blue-800 font-semibold">Date & Time</TableHead>
+
+                  <TableHead className="text-blue-800 font-semibold">Price</TableHead>
+
+                  <TableHead className="text-blue-800 font-semibold text-right">Actions</TableHead>
+
+                </TableRow>
+
+              </TableHeader>
+
+              <TableBody>
+
+                {filteredServices.map((service) => (
+
+                  <TableRow key={service.id} className="hover:bg-blue-50/50 transition-colors duration-200">
+
+                    <TableCell>
+
+                      <div className="space-y-1">
+
+                        <div className="font-medium text-gray-900">{service.customers?.name || 'Unknown'}</div>
+
+                        {service.customers?.email && (
+
+                          <div className="text-sm text-gray-500">{service.customers.email}</div>
+
+                        )}
+
+                      </div>
+
+                    </TableCell>
+
+                    <TableCell className="font-medium text-gray-900">{service.service_name}</TableCell>
+
+                    <TableCell>
+
+                      {getServiceCategoryBadge(service.service_category)}
+
+                    </TableCell>
+
+                    <TableCell>
+
+                      {service.workers ? (
+
+                        <div className="flex items-center gap-2">
+
+                          <UserCheck className="h-4 w-4 text-indigo-500" />
+
+                          <span className="text-sm text-gray-700">{service.workers.name}</span>
+
+                        </div>
+
+                      ) : (
+
+                        <span className="text-muted-foreground">-</span>
+
+                      )}
+
+                    </TableCell>
+
+                    <TableCell>{getStatusBadge(service.status)}</TableCell>
+
+                    <TableCell>
+
+                      <div className="flex items-center gap-2">
+
+                        <Calendar className="h-4 w-4 text-blue-500" />
+
+                        <span className="text-sm text-gray-700">{formatDate(service.date_time)}</span>
+
+                      </div>
+
+                    </TableCell>
+
+                    <TableCell>
+
+                      <div className="flex items-center gap-2">
+
+                        <DollarSign className="h-4 w-4 text-emerald-500" />
+
+                        <span className="font-semibold text-emerald-700">{formatCurrency(service.service_price)}</span>
+
+                      </div>
+
+                    </TableCell>
+
+                    <TableCell className="text-right">
+
+                      <div className="flex items-center justify-end space-x-2">
+
+                        <Button
+
+                          variant="ghost"
+
+                          size="sm"
+
+                          onClick={() => openReceipt(service)}
+
+                          className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+
+                        >
+
+                          <Receipt className="h-4 w-4" />
+
+                        </Button>
+
+                        <Button
+
+                          variant="ghost"
+
+                          size="sm"
+
+                          onClick={() => openDialog(service)}
+
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+
+                        >
+
+                          <Edit className="h-4 w-4" />
+
+                        </Button>
+
+                        <Button
+
+                          variant="ghost"
+
+                          size="sm"
+
+                          onClick={() => handleDelete(service.id)}
+
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+
+                        >
+
+                          <Trash2 className="h-4 w-4" />
+
+                        </Button>
+
+                      </div>
+
+                    </TableCell>
+
+                  </TableRow>
+
+                ))}
+
+                {filteredServices.length === 0 && (
+
+                  <TableRow>
+
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+
+                      <div className="flex flex-col items-center gap-2">
+
+                        <Scissors className="h-12 w-12 text-gray-300" />
+
+                        <p>No services found</p>
+
+                        <p className="text-sm">Start by creating your first service</p>
+
+                      </div>
+
+                    </TableCell>
+
+                  </TableRow>
+
+                )}
+
+              </TableBody>
+
+            </Table>
+
+          )}
+
+        </CardContent>
+
+      </Card>
+
+
+
+      {/* Service Dialog */}
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto border-0 shadow-2xl">
+          <form onSubmit={handleSubmit}>
+
+            <DialogHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 p-6 -m-6 mb-6 rounded-t-lg">
+
+              <DialogTitle className="text-blue-800">
+
+                {editingService ? "Edit Service" : "Add New Service"}
+
+              </DialogTitle>
+
+              <DialogDescription className="text-blue-600">
+
+                {editingService ? "Update service information" : "Create a new service for your salon"}
+
+              </DialogDescription>
+
+            </DialogHeader>
+
+                        <div className="grid gap-6 py-4">
+              {/* Customer Selection */}
+              <div className="grid gap-2">
+                <Label className="text-gray-700 font-medium">Customer *</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={isNewCustomer ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setIsNewCustomer(false)}
+                    className={!isNewCustomer ? "bg-blue-600 text-white" : ""}
+                  >
+                    Existing Customer
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={isNewCustomer ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setIsNewCustomer(true)}
+                    className={isNewCustomer ? "bg-blue-600 text-white" : ""}
+                  >
+                    New Customer
+                  </Button>
+                </div>
+              </div>
+
+              {!isNewCustomer ? (
+                <div className="grid gap-2">
+                  <Label htmlFor="customer_id" className="text-gray-700 font-medium">Select Customer *</Label>
+                  <Select
+                    value={formData.customer_id}
+                    onValueChange={(value) => setFormData({ ...formData, customer_id: value })}
+                    required
+                  >
+                    <SelectTrigger className="border-gray-200 focus:border-blue-400 focus:ring-blue-400">
+                      <SelectValue placeholder="Choose a customer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customers.map((customer) => (
+                        <SelectItem key={customer.id} value={customer.id}>
+                          {customer.name} {customer.email && `(${customer.email})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="customer_name" className="text-gray-700 font-medium">Customer Name *</Label>
+                    <Input
+                      id="customer_name"
+                      value={formData.customer_name}
+                      onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
+                      required
+                      className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="customer_email" className="text-gray-700 font-medium">Customer Email</Label>
+                    <Input
+                      id="customer_email"
+                      type="email"
+                      value={formData.customer_email}
+                      onChange={(e) => setFormData({ ...formData, customer_email: e.target.value })}
+                      className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                    />
+                  </div>
+                  <div className="grid gap-2 col-span-2">
+                    <Label htmlFor="customer_phone" className="text-gray-700 font-medium">Customer Phone</Label>
+                    <Input
+                      id="customer_phone"
+                      value={formData.customer_phone}
+                      onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
+                      className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+
+                <Label htmlFor="service_name" className="text-gray-700 font-medium">Service Name *</Label>
+
+                <Input
+
+                  id="service_name"
+
+                  value={formData.service_name}
+
+                  onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
+
+                  required
+
+                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+
+                />
+
+              </div>
+
+              <div className="grid gap-2">
+
+                <Label htmlFor="service_category" className="text-gray-700 font-medium">Category *</Label>
+
+                <Input
+
+                  id="service_category"
+
+                  value={formData.service_category}
+
+                  onChange={(e) => setFormData({ ...formData, service_category: e.target.value })}
+
+                  required
+
+                  placeholder="e.g., Haircut, Coloring, Styling"
+
+                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+
+                />
+
+              </div>
+
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+
+                <Label htmlFor="service_price" className="text-gray-700 font-medium">Price *</Label>
+
+                <Input
+
+                  id="service_price"
+
+                  type="number"
+
+                  step="0.01"
+
+                  value={formData.service_price}
+
+                  onChange={(e) => setFormData({ ...formData, service_price: e.target.value })}
+
+                  required
+
+                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+
+                />
+
+              </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="staff_member_id" className="text-gray-700 font-medium">Staff Member</Label>
+                  <Select
+                    value={formData.staff_member_id}
+                    onValueChange={(value) => setFormData({ ...formData, staff_member_id: value })}
+                  >
+                    <SelectTrigger className="border-gray-200 focus:border-blue-400 focus:ring-blue-400">
+                      <SelectValue placeholder="Select staff member (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {workers.map((worker) => (
+                        <SelectItem key={worker.id} value={worker.id}>
+                          {worker.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="status" className="text-gray-700 font-medium">Status *</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(value) => setFormData({ ...formData, status: value })}
+                    required
+                  >
+                    <SelectTrigger className="border-gray-200 focus:border-blue-400 focus:ring-blue-400">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              <div className="grid gap-2">
+
+                <Label htmlFor="date_time" className="text-gray-700 font-medium">Date & Time *</Label>
+
+                <Input
+
+                  id="date_time"
+
+                  type="datetime-local"
+
+                  value={formData.date_time}
+
+                  onChange={(e) => setFormData({ ...formData, date_time: e.target.value })}
+
+                  required
+
+                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+
+                />
+
+              </div>
+
+              </div>
+
+              <div className="grid gap-2">
+
+                <Label htmlFor="notes" className="text-gray-700 font-medium">Notes</Label>
+
+                <Textarea
+
+                  id="notes"
+
+                  value={formData.notes}
+
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+
+                  placeholder="Additional notes about the service..."
+
+                  rows={3}
+
+                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+
+                />
+
+              </div>
+
+            </div>
+
+            <DialogFooter className="bg-gray-50 p-6 -m-6 mt-6 rounded-b-lg">
+
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="border-gray-300">
+
+                Cancel
+
+              </Button>
+
+              <Button 
+
+                type="submit" 
+
+                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white"
+
+              >
+
+                {editingService ? "Update" : "Create"}
+
+              </Button>
+
+            </DialogFooter>
+
+          </form>
+
+        </DialogContent>
+
+      </Dialog>
+
+
+
+      {/* Receipt Dialog */}
+
+      <ReceiptDialog
+
+        isOpen={isReceiptOpen}
+
+        onClose={() => setIsReceiptOpen(false)}
+
+        service={selectedService}
+
+      />
+
+    </div>
+
+  );
+
 }

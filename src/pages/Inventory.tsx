@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingUp, TrendingDown, Box, DollarSign, Calendar, Tag, BarChart3 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingUp, TrendingDown, Box, DollarSign, Calendar, Tag, BarChart3, Receipt } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { InventoryReceiptDialog } from "@/components/inventory/InventoryReceiptDialog";
 
 interface InventoryItem {
   id: string;
@@ -43,8 +44,8 @@ interface Transaction {
   total_amount: number | null;
   reason: string | null;
   reference_number: string | null;
-  transaction_date: string;
-  inventory_items: { name: string };
+  created_at: string;
+  inventory_items: { name: string; unit_price: number; supplier: string | null };
 }
 
 export default function Inventory() {
@@ -77,6 +78,10 @@ export default function Inventory() {
     reference_number: "",
   });
   
+  // Receipt dialog state
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -91,8 +96,8 @@ export default function Inventory() {
         supabase.from("inventory_categories").select("*").order("name"),
         supabase.from("inventory_transactions").select(`
           *,
-          inventory_items(name)
-        `).order("transaction_date", { ascending: false }).limit(50)
+          inventory_items(name, unit_price, supplier)
+        `).order("created_at", { ascending: false }).limit(50)
       ]);
 
       if (itemsResponse.error) throw itemsResponse.error;
@@ -216,6 +221,27 @@ export default function Inventory() {
 
       if (updateError) throw updateError;
 
+      // Get the created transaction to show receipt
+      const { data: newTransaction, error: fetchError } = await supabase
+        .from("inventory_transactions")
+        .select(`
+          *,
+          inventory_items(name, unit_price, supplier)
+        `)
+        .eq("item_id", selectedItem.id)
+        .eq("created_by", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (fetchError) {
+        console.warn("Could not fetch transaction for receipt:", fetchError);
+      } else {
+        // Show receipt for the new transaction
+        setSelectedTransaction(newTransaction);
+        setIsReceiptOpen(true);
+      }
+
       toast({ title: "Success", description: "Transaction recorded successfully" });
       setIsTransactionDialogOpen(false);
       setSelectedItem(null);
@@ -302,6 +328,11 @@ export default function Inventory() {
     setIsTransactionDialogOpen(true);
   };
 
+  const openReceipt = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setIsReceiptOpen(true);
+  };
+
   const filteredItems = items.filter((item) =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (item.supplier && item.supplier.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -366,7 +397,7 @@ export default function Inventory() {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'UGX',
     }).format(amount);
   };
 
@@ -460,7 +491,7 @@ export default function Inventory() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {items.map((item) => (
+                    {filteredItems.map((item) => (
                       <TableRow key={item.id} className="hover:bg-green-50/50 transition-colors duration-200">
                         <TableCell>
                           <div className="space-y-1">
@@ -545,7 +576,7 @@ export default function Inventory() {
                         </TableCell>
                       </TableRow>
                     ))}
-                    {items.length === 0 && (
+                    {filteredItems.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                           <div className="flex flex-col items-center gap-2">
@@ -587,6 +618,7 @@ export default function Inventory() {
                       <TableHead className="text-blue-800 font-semibold">Unit Price</TableHead>
                       <TableHead className="text-blue-800 font-semibold">Total Amount</TableHead>
                       <TableHead className="text-blue-800 font-semibold">Reason</TableHead>
+                      <TableHead className="text-blue-800 font-semibold text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -595,7 +627,7 @@ export default function Inventory() {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Calendar className="h-4 w-4 text-blue-500" />
-                            <span className="text-sm text-gray-700">{formatDate(transaction.transaction_date)}</span>
+                            <span className="text-sm text-gray-700">{formatDate(transaction.created_at)}</span>
                           </div>
                         </TableCell>
                         <TableCell className="font-medium text-gray-900">{transaction.inventory_items.name}</TableCell>
@@ -630,11 +662,21 @@ export default function Inventory() {
                             <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openReceipt(transaction)}
+                            className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                          >
+                            <Receipt className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                     {transactions.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           <div className="flex flex-col items-center gap-2">
                             <BarChart3 className="h-12 w-12 text-gray-300" />
                             <p>No transactions found</p>
@@ -822,6 +864,13 @@ export default function Inventory() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Inventory Receipt Dialog */}
+      <InventoryReceiptDialog
+        isOpen={isReceiptOpen}
+        onClose={() => setIsReceiptOpen(false)}
+        transaction={selectedTransaction}
+      />
     </div>
   );
 }

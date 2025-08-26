@@ -33,7 +33,7 @@ interface ServiceHistory {
   status: string;
   date_time: string;
   notes: string | null;
-  staff_member: {
+  staff_member?: {
     name: string;
   } | null;
   created_at: string;
@@ -99,7 +99,6 @@ export default function Customers() {
           status,
           date_time,
           notes,
-          staff_member:workers(name),
           created_at
         `)
         .eq("customer_id", customerId)
@@ -265,7 +264,7 @@ export default function Customers() {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'UGX',
     }).format(amount);
   };
 

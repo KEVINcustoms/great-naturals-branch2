@@ -70,6 +70,13 @@ export function ReceiptDialog({ isOpen, onClose, service }: ReceiptDialogProps) 
     window.print();
   };
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'UGX',
+    }).format(amount);
+  };
+
   if (!service) return null;
 
   const totalProductPrice = serviceProducts.reduce((sum, sp) => sum + sp.total_price, 0);
@@ -77,20 +84,20 @@ export function ReceiptDialog({ isOpen, onClose, service }: ReceiptDialogProps) 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader className="text-center space-y-2">
           <img 
             src={greatNaturalsLogo} 
             alt="Great Naturals" 
-            className="mx-auto h-16 w-auto object-contain"
+            className="mx-auto h-24 w-auto object-contain"
           />
-          <DialogTitle className="text-xl font-bold text-center">Receipt</DialogTitle>
+          <DialogTitle className="text-2xl font-bold text-center text-gray-800">Receipt</DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4 print:text-black">
-          <div className="text-center space-y-1">
-            <h2 className="text-lg font-semibold text-primary">GREAT NATURALS</h2>
-            <p className="text-sm text-muted-foreground">To reach your goal</p>
+          <div className="text-center space-y-2">
+            <h2 className="text-2xl font-bold text-primary tracking-wide">GREAT NATURALS</h2>
+            <p className="text-sm text-muted-foreground font-medium">To reach your goal</p>
           </div>
           
           <div className="border-t border-b py-4 space-y-2">
@@ -108,7 +115,7 @@ export function ReceiptDialog({ isOpen, onClose, service }: ReceiptDialogProps) 
             </div>
             <div className="flex justify-between">
               <span className="font-medium">Service Price:</span>
-              <span>${service.service_price.toFixed(2)}</span>
+              <span>{formatCurrency(service.service_price)}</span>
             </div>
             {service.workers?.name && (
               <div className="flex justify-between">
@@ -129,7 +136,7 @@ export function ReceiptDialog({ isOpen, onClose, service }: ReceiptDialogProps) 
                 serviceProducts.map((sp, index) => (
                   <div key={index} className="flex justify-between text-sm">
                     <span>{sp.products.name} x {sp.quantity}</span>
-                    <span>${sp.total_price.toFixed(2)}</span>
+                    <span>{formatCurrency(sp.total_price)}</span>
                   </div>
                 ))
               )}
@@ -151,7 +158,7 @@ export function ReceiptDialog({ isOpen, onClose, service }: ReceiptDialogProps) 
           <div className="border-t pt-4">
             <div className="flex justify-between text-lg font-bold">
               <span>Total:</span>
-              <span>${grandTotal.toFixed(2)}</span>
+              <span>{formatCurrency(grandTotal)}</span>
             </div>
           </div>
 

@@ -5,6 +5,12 @@ import { LoginForm } from "./LoginForm";
 import { SignUpForm } from "./SignUpForm";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, Zap, Shield, BarChart3, Star, Mail, Phone, MapPin, Clock, Github, Linkedin, Twitter } from "lucide-react";
+import greatNaturalsLogo from "@/assets/great-naturals-logo.png";
+import hairShowcase from "@/assets/hair_shocase.jpg";
+import salonProducts from "@/assets/saloon_products.jpg";
+import salonAward from "@/assets/saloon_award.jpg";
+import customerReview from "@/assets/customer_review_image.jpg";
+import rightColumnBg from "@/assets/right_column_bg.jpg";
 
 export function AuthPage() {
   const [activeTab, setActiveTab] = useState("login");
@@ -19,12 +25,14 @@ export function AuthPage() {
             {/* Branding */}
             <div className="text-center space-y-2">
               <div className="flex items-center justify-center space-x-2">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-xl">G</span>
-                </div>
-                <span className="text-2xl font-bold text-gray-800">Groom Stream</span>
+                                 <img 
+                   src={greatNaturalsLogo} 
+                   alt="Great Naturals" 
+                   className="w-16 h-16 object-contain"
+                 />
+                                 <span className="text-2xl font-bold text-gray-800">Great Naturals</span>
               </div>
-              <h1 className="text-3xl font-bold text-gray-900">Welcome back</h1>
+                             <h1 style={{ color: '#859447' }} className="text-3xl font-bold">Welcome back</h1>
               <p className="text-gray-600">Sign in to your salon management dashboard</p>
             </div>
 
@@ -57,130 +65,134 @@ export function AuthPage() {
                   >
                     Sign Up
                   </TabsTrigger>
-                </TabsList>
+            </TabsList>
                 
-                <TabsContent value="login" className="mt-6">
-                  <LoginForm />
-                </TabsContent>
-                <TabsContent value="signup" className="mt-6">
-                  <SignUpForm />
-                </TabsContent>
-              </Tabs>
+            <TabsContent value="login" className="mt-6">
+              <LoginForm />
+            </TabsContent>
+            <TabsContent value="signup" className="mt-6">
+              <SignUpForm />
+            </TabsContent>
+          </Tabs>
             </div>
           </div>
         </div>
 
-        {/* Right Column - Promotional Content */}
-        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-12 items-center justify-center">
-          <div className="max-w-lg space-y-8">
+                 {/* Right Column - Salon Showcase */}
+         <div className="hidden lg:flex lg:w-1/2 p-8 items-center justify-center relative overflow-hidden">
+           {/* Background Image with Professional Fade */}
+           <div className="absolute inset-0">
+             <img 
+               src={rightColumnBg} 
+               alt="Salon Background" 
+               className="w-full h-full object-cover"
+             />
+             <div className="absolute inset-0 bg-gradient-to-br from-gray-900/85 via-gray-800/80 to-gray-900/85"></div>
+           </div>
+          
+          <div className="relative z-10 w-full max-w-2xl space-y-8">
             {/* Branding */}
-            <div className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xl">G</span>
-              </div>
-              <span className="text-2xl font-bold text-white">Groom Stream</span>
+            <div className="flex items-center justify-center space-x-2 mb-8">
+                             <img 
+                 src={greatNaturalsLogo} 
+                 alt="Great Naturals" 
+                 className="w-20 h-20 object-contain"
+               />
+                             <span className="text-3xl font-bold text-white">Great Naturals</span>
             </div>
 
             {/* Headline */}
-            <div className="space-y-4">
-              <h2 className="text-4xl font-bold text-white leading-tight">
+            <div className="text-center space-y-4 mb-8">
+              <h2 className="text-5xl font-bold text-white leading-tight">
                 The future of{" "}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">
-                  salon management
-                </span>
+                                 <span style={{ color: '#859447' }}>
+                   salon management
+                 </span>
               </h2>
-              <p className="text-lg text-gray-300 leading-relaxed">
+              <p className="text-xl text-gray-300 leading-relaxed max-w-lg mx-auto">
                 Join thousands of salons using AI-powered tools to streamline operations, reduce costs, and deliver exceptional customer care.
               </p>
             </div>
 
-            {/* Feature Cards */}
-            <div className="grid gap-4">
-              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
-                      <CheckCircle className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-white">Smart Inventory</h3>
-                      <p className="text-sm text-gray-400">Real-time tracking with expiry alerts</p>
-                    </div>
-                  </div>
-                  <div className="text-gray-500">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
+            {/* Salon Showcase Gallery */}
+            <div className="grid grid-cols-2 gap-4 mb-8">
+                             {/* Hair Showcase */}
+               <div className="bg-gradient-to-br from-blue-600/20 to-cyan-600/20 rounded-2xl p-6 border border-blue-500/30 backdrop-blur-sm">
+                 <div className="w-full h-32 rounded-xl mb-4 overflow-hidden">
+                   <img 
+                     src={hairShowcase} 
+                     alt="Professional Hair Styling" 
+                     className="w-full h-full object-cover"
+                   />
+                 </div>
+                 <h3 className="text-white font-semibold text-center">Professional Hair Styling</h3>
+                 <p className="text-blue-200 text-sm text-center">Expert techniques & stunning results</p>
+               </div>
 
-              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center">
-                      <Zap className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-white">Lightning Fast</h3>
-                      <p className="text-sm text-gray-400">Process appointments in under 30 seconds</p>
-                    </div>
-                  </div>
-                  <div className="text-gray-500">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
+                             {/* Salon Products */}
+               <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-2xl p-6 border border-purple-500/30 backdrop-blur-sm">
+                 <div className="w-full h-32 rounded-xl mb-4 overflow-hidden">
+                   <img 
+                     src={salonProducts} 
+                     alt="Premium Salon Products" 
+                     className="w-full h-full object-cover"
+                   />
+                 </div>
+                 <h3 className="text-white font-semibold text-center">Premium Products</h3>
+                 <p className="text-purple-200 text-sm text-center">High-quality beauty essentials</p>
+               </div>
 
-              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                      <Shield className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-white">Secure & Compliant</h3>
-                      <p className="text-sm text-gray-400">GDPR compliant with role-based access</p>
-                    </div>
-                  </div>
-                  <div className="text-gray-500">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
+                             {/* Customer Experience */}
+               <div className="bg-gradient-to-br from-green-600/20 to-emerald-600/20 rounded-2xl p-6 border border-green-500/30 backdrop-blur-sm">
+                 <div className="w-full h-35 rounded-xl mb-4 overflow-hidden">
+                   <img 
+                     src={customerReview} 
+                     alt="Customer Satisfaction" 
+                     className="w-full h-full object-cover"
+                   />
+                 </div>
+                 <h3 className="text-white font-semibold text-center">Customer Experience</h3>
+                 <p className="text-green-200 text-sm text-center">Exceptional service delivery</p>
+               </div>
 
-              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
-                      <BarChart3 className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-white">Powerful Analytics</h3>
-                      <p className="text-sm text-gray-400">Insights that drive profitability</p>
-                    </div>
-                  </div>
-                  <div className="text-gray-500">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
+                             {/* Salon Excellence */}
+               <div className="bg-gradient-to-br from-orange-600/20 to-red-600/20 rounded-2xl p-6 border border-orange-500/30 backdrop-blur-sm">
+                 <div className="w-full h-35 rounded-xl mb-4 overflow-hidden">
+                   <img 
+                     src={salonAward} 
+                     alt="Salon Excellence" 
+                     className="w-full h-full object-cover object-top -mt-8"
+                   />
+                 </div>
+                 <h3 className="text-white font-semibold text-center">Salon Excellence</h3>
+                 <p className="text-orange-200 text-sm text-center">Award-winning service quality</p>
+               </div>
+            </div>
+
+            {/* Feature Highlights */}
+            <div className="grid gap-3 mb-6">
+              <div className="flex items-center space-x-3 text-white">
+                <CheckCircle className="w-5 h-5 text-green-400" />
+                <span className="text-sm">Smart inventory management with real-time tracking</span>
+              </div>
+              <div className="flex items-center space-x-3 text-white">
+                <Zap className="w-5 h-5 text-yellow-400" />
+                <span className="text-sm">Lightning-fast appointment processing</span>
+              </div>
+              <div className="flex items-center space-x-3 text-white">
+                <Shield className="w-5 h-5 text-blue-400" />
+                <span className="text-sm">Secure & GDPR compliant platform</span>
               </div>
             </div>
 
             {/* Rating */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center justify-center space-x-2">
               <div className="flex space-x-1">
                 {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                  <Star key={i} className="w-6 h-6 fill-yellow-400 text-yellow-400" />
                 ))}
               </div>
-              <span className="text-gray-400 text-sm">Trusted by 1000+ salons</span>
+              <span className="text-gray-300 text-sm font-medium">Trusted by 1000+ salons</span>
             </div>
           </div>
         </div>
@@ -193,10 +205,12 @@ export function AuthPage() {
             {/* Company Info */}
             <div className="lg:col-span-2 space-y-4">
               <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">G</span>
-                </div>
-                <span className="text-xl font-bold">Groom Stream</span>
+                                 <img 
+                   src={greatNaturalsLogo} 
+                   alt="Great Naturals" 
+                   className="w-14 h-14 object-contain"
+                 />
+                                 <span className="text-xl font-bold">Great Naturals</span>
               </div>
               <p className="text-gray-400 max-w-md">
                 The future of salon management. Streamline operations, reduce costs, and deliver exceptional customer care with our AI-powered platform.
