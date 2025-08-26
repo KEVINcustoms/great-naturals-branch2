@@ -20,6 +20,7 @@ interface DashboardStats {
     message: string;
     time: string;
   }>;
+  totalActivities: number;
 }
 
 export default function Dashboard() {
@@ -42,9 +43,11 @@ export default function Dashboard() {
     unreadAlerts: 0,
     totalInventoryValue: 0,
     criticalAlerts: 0,
-    recentActivities: []
+    recentActivities: [],
+    totalActivities: 0
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [showAllActivities, setShowAllActivities] = useState(false);
 
   useEffect(() => {
     fetchDashboardStats();
@@ -158,7 +161,8 @@ export default function Dashboard() {
         unreadAlerts: unreadAlerts.length,
         totalInventoryValue,
         criticalAlerts: criticalAlerts.length,
-        recentActivities: activities.slice(0, 5)
+        recentActivities: activities,
+        totalActivities: activities.length
       });
 
     } catch (error) {
@@ -321,8 +325,8 @@ export default function Dashboard() {
                 ))}
               </div>
             ) : stats.recentActivities.length > 0 ? (
-              <div className="space-y-4">
-                {stats.recentActivities.map((activity) => (
+              <div className="space-y-4 transition-all duration-300 ease-in-out">
+                {stats.recentActivities.slice(0, showAllActivities ? stats.recentActivities.length : 5).map((activity) => (
                   <div key={activity.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-indigo-100 hover:bg-indigo-50 transition-colors duration-200">
                     <div className="flex items-center gap-3">
                       {getActivityIcon(activity.type)}
@@ -333,6 +337,43 @@ export default function Dashboard() {
                     </Badge>
                   </div>
                 ))}
+                
+                {/* View More Footer */}
+                {stats.totalActivities > 5 && (
+                  <div className="border-t border-indigo-100 pt-4 mt-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm text-indigo-600">
+                        <Activity className="h-4 w-4" />
+                        <span className="font-medium">
+                          {showAllActivities 
+                            ? `Showing all ${stats.totalActivities} activities` 
+                            : `${Math.max(0, stats.totalActivities - 5)} more activities available`
+                          }
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300"
+                          onClick={() => setShowAllActivities(!showAllActivities)}
+                        >
+                          {showAllActivities ? 'Show Less' : 'Show More'}
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                          asChild
+                        >
+                          <a href="/activities" className="text-sm font-medium">
+                            View All
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center py-8">

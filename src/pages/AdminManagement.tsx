@@ -432,9 +432,9 @@ export default function AdminManagement() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
         {/* Users List */}
-        <div className="lg:col-span-1">
+        <div className="xl:col-span-1">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -480,7 +480,7 @@ export default function AdminManagement() {
               </div>
 
               {/* Users List */}
-              <div className="space-y-2 max-h-96 overflow-y-auto">
+              <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto">
                 {filteredUsers.map((user) => (
                   <div
                     key={user.id}
@@ -491,19 +491,17 @@ export default function AdminManagement() {
                     }`}
                     onClick={() => handleUserSelect(user)}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-full ${
-                          user.role === 'admin' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          {user.role === 'admin' ? <Shield className="h-4 w-4" /> : <Users className="h-4 w-4" />}
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">{user.full_name}</p>
-                          <p className="text-xs text-gray-500">{user.email}</p>
-                        </div>
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 rounded-full flex-shrink-0 ${
+                        user.role === 'admin' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {user.role === 'admin' ? <Shield className="h-4 w-4" /> : <Users className="h-4 w-4" />}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{user.full_name}</p>
+                        <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                      </div>
+                      <div className="flex-shrink-0">
                         <Badge className={getAccessLevelColor(user.access_level)}>
                           {getAccessLevelIcon(user.access_level)}
                           <span className="ml-1 text-xs">
@@ -521,7 +519,7 @@ export default function AdminManagement() {
         </div>
 
         {/* User Details */}
-        <div className="lg:col-span-2">
+        <div className="xl:col-span-3">
           {selectedUser ? (
             <Card>
               <CardHeader>
@@ -555,11 +553,11 @@ export default function AdminManagement() {
               </CardHeader>
               <CardContent>
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="grid w-full grid-cols-4">
-                    <TabsTrigger value="overview">Overview</TabsTrigger>
-                    <TabsTrigger value="services">Services</TabsTrigger>
-                    <TabsTrigger value="customers">Customers</TabsTrigger>
-                    <TabsTrigger value="activity">Activity</TabsTrigger>
+                  <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 gap-1">
+                    <TabsTrigger value="overview" className="text-xs md:text-sm">Overview</TabsTrigger>
+                    <TabsTrigger value="services" className="text-xs md:text-sm">Services</TabsTrigger>
+                    <TabsTrigger value="customers" className="text-xs md:text-sm">Customers</TabsTrigger>
+                    <TabsTrigger value="activity" className="text-xs md:text-sm">Activity</TabsTrigger>
                   </TabsList>
 
                   {/* Overview Tab */}
@@ -570,7 +568,7 @@ export default function AdminManagement() {
                         <p className="text-sm text-gray-500">Loading statistics...</p>
                       </div>
                     ) : userStats ? (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                         <Card>
                           <CardContent className="p-4 text-center">
                             <div className="text-2xl font-bold text-blue-600">{userStats.total_services}</div>
@@ -633,7 +631,7 @@ export default function AdminManagement() {
                         <p className="text-sm text-gray-500">Loading services...</p>
                       </div>
                     ) : userServices.length > 0 ? (
-                      <div className="border rounded-lg">
+                      <div className="border rounded-lg overflow-x-auto">
                         <Table>
                           <TableHeader>
                             <TableRow>
@@ -683,7 +681,7 @@ export default function AdminManagement() {
                         <p className="text-sm text-gray-500">Loading customers...</p>
                       </div>
                     ) : userCustomers.length > 0 ? (
-                      <div className="border rounded-lg">
+                      <div className="border rounded-lg overflow-x-auto">
                         <Table>
                           <TableHeader>
                             <TableRow>
