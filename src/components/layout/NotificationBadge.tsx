@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Bell } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
 export function NotificationBadge() {
@@ -20,7 +21,13 @@ export function NotificationBadge() {
       }, () => {
         fetchUnreadCount();
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Notification badge subscription active');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('Notification badge subscription error');
+        }
+      });
 
     return () => {
       supabase.removeChannel(subscription);
@@ -31,19 +38,24 @@ export function NotificationBadge() {
     try {
       const { data, error } = await supabase
         .from('alerts')
-        .select('id', { count: 'exact' })
+        .select('id')
         .eq('is_read', false);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        return;
+      }
+      
       setUnreadCount(data?.length || 0);
     } catch (error) {
       console.error('Error fetching unread alerts count:', error);
+      setUnreadCount(0);
     }
   };
 
   return (
     <Button variant="ghost" size="icon" className="relative" asChild>
-      <a href="/alerts">
+      <Link to="/alerts" onClick={() => console.log('Navigating to alerts page')}>
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
           <Badge 
@@ -53,7 +65,7 @@ export function NotificationBadge() {
             {unreadCount > 99 ? '99+' : unreadCount}
           </Badge>
         )}
-      </a>
+      </Link>
     </Button>
   );
 }

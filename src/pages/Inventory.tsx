@@ -45,7 +45,14 @@ interface Transaction {
   reason: string | null;
   reference_number: string | null;
   created_at: string;
-  inventory_items: { name: string; unit_price: number; supplier: string | null };
+  inventory_items: {
+    id: string;
+    name: string;
+    unit_price: number;
+    supplier: string | null;
+    current_stock: number;
+    category_id: string | null;
+  };
 }
 
 export default function Inventory() {
@@ -96,7 +103,7 @@ export default function Inventory() {
         supabase.from("inventory_categories").select("*").order("name"),
         supabase.from("inventory_transactions").select(`
           *,
-          inventory_items(name, unit_price, supplier)
+          inventory_items(id, name, unit_price, supplier, current_stock, category_id)
         `).order("created_at", { ascending: false }).limit(50)
       ]);
 
@@ -226,7 +233,7 @@ export default function Inventory() {
         .from("inventory_transactions")
         .select(`
           *,
-          inventory_items(name, unit_price, supplier)
+          inventory_items(id, name, unit_price, supplier, current_stock, category_id)
         `)
         .eq("item_id", selectedItem.id)
         .eq("created_by", user.id)

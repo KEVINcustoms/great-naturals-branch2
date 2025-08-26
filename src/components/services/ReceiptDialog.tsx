@@ -49,16 +49,31 @@ export function ReceiptDialog({ isOpen, onClose, service }: ReceiptDialogProps) 
     
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      // First get service products
+      const { data: products, error: productsError } = await supabase
         .from("service_products")
-        .select(`
-          *,
-          inventory_items (name)
-        `)
+        .select("*")
         .eq("service_id", service.id);
 
-      if (error) throw error;
-      setServiceProducts(data || []);
+      if (productsError) throw productsError;
+
+      // Then get inventory item names for each product
+      const productsWithNames = await Promise.all(
+        (products || []).map(async (product) => {
+          const { data: item } = await supabase
+            .from("inventory_items")
+            .select("name")
+            .eq("id", product.product_id)
+            .single();
+          
+          return {
+            ...product,
+            inventory_items: { name: item?.name || "Unknown Item" }
+          };
+        })
+      );
+
+      setServiceProducts(productsWithNames);
     } catch (error) {
       console.error("Error fetching service products:", error);
     } finally {

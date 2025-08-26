@@ -27,6 +27,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { getUserRoleDisplay, isAdmin } from "@/utils/permissions";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // All available menu items
 const allMenuItems = [
@@ -46,8 +47,14 @@ const adminItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, isSigningOut } = useAuth();
   const currentPath = location.pathname;
+
+  const handleSignOut = () => {
+    if (window.confirm('Are you sure you want to sign out?')) {
+      signOut();
+    }
+  };
 
   // Filter menu items based on user role
   const menuItems = allMenuItems.filter(item => !item.adminOnly || isAdmin(profile));
@@ -134,15 +141,31 @@ export function AppSidebar() {
         )}
 
         <div className="mt-auto p-2">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={signOut}
-            className="w-full justify-start"
-          >
-            <LogOut className="h-4 w-4" />
-            <span className="ml-2">Sign Out</span>
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleSignOut}
+                  disabled={isSigningOut}
+                  className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSigningOut ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600" />
+                  ) : (
+                    <LogOut className="h-4 w-4" />
+                  )}
+                  <span className="ml-2">
+                    {isSigningOut ? 'Signing Out...' : 'Sign Out'}
+                  </span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Sign out of your account</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </SidebarContent>
     </Sidebar>

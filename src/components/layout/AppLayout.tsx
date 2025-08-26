@@ -6,16 +6,25 @@ import { useAuth } from "@/hooks/useAuth";
 import { useInventoryAlerts } from "@/hooks/useInventoryAlerts";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface AppLayoutProps {
   children: ReactNode;
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
-  const { profile } = useAuth();
+  const { profile, signOut, isSigningOut } = useAuth();
   
   // Initialize automated inventory alerts
   useInventoryAlerts();
+
+  const handleSignOut = () => {
+    if (window.confirm('Are you sure you want to sign out?')) {
+      signOut();
+    }
+  };
 
   return (
     <SidebarProvider>
@@ -42,6 +51,31 @@ export function AppLayout({ children }: AppLayoutProps) {
                     </Badge>
                   </div>
                 </Card>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleSignOut}
+                        disabled={isSigningOut}
+                        className="flex items-center gap-2 text-gray-600 hover:text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isSigningOut ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600" />
+                        ) : (
+                          <LogOut className="h-4 w-4" />
+                        )}
+                        <span className="hidden sm:inline">
+                          {isSigningOut ? 'Signing Out...' : 'Sign Out'}
+                        </span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Sign out of your account</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             )}
           </header>

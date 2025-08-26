@@ -23,8 +23,9 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   isLoading: boolean;
+  isSigningOut: boolean;
   signOut: () => Promise<void>;
-  signIn: (email: string, password: string) => Promise<{ data: any; error: any } | { data: null; error: any }>;
+  signIn: (email: string, password: string) => Promise<{ data: { user: User; session: Session } | null; error: AuthError | null } | { data: null; error: AuthError | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
   const createProfile = useCallback(async (userId: string, email: string, fullName?: string): Promise<Profile | null> => {
@@ -281,15 +283,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     try {
       console.log('Signing out...');
+      setIsSigningOut(true);
+      
+      // Clear local state first
+      setUser(null);
+      setSession(null);
+      setProfile(null);
+      
+      // Sign out from Supabase
       const { error } = await supabase.auth.signOut();
       
       if (error) {
         console.error('Error during sign out:', error);
+        console.warn('Signed out locally but there was an issue with the server. Please refresh the page.');
       } else {
         console.log('Sign out completed successfully');
       }
     } catch (error) {
       console.error('Unexpected error during sign out:', error);
+      // Clear local state even if there's an error
+      setUser(null);
+      setSession(null);
+      setProfile(null);
+      console.warn('An error occurred during sign out, but you have been signed out locally.');
+    } finally {
+      setIsSigningOut(false);
     }
   };
 
@@ -318,19 +336,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
 
           // Check if user is banned or restricted
-          if (profile.access_level === 'banned') {
+          if (profile && 'access_level' in profile && profile.access_level === 'banned') {
             // Sign out the user immediately
             await supabase.auth.signOut();
             throw new Error('Your account has been banned from the system. Please contact an administrator for more information.');
           }
 
-          if (profile.access_level === 'restricted') {
+          if (profile && 'access_level' in profile && profile.access_level === 'restricted') {
             // Sign out the user immediately
             await supabase.auth.signOut();
             throw new Error('Your account access has been restricted. Please contact an administrator for more information.');
           }
 
-          if (profile.is_active === false) {
+          if (profile && 'is_active' in profile && profile.is_active === false) {
             // Sign out the user immediately
             await supabase.auth.signOut();
             throw new Error('Your account has been deactivated. Please contact an administrator for more information.');
@@ -353,6 +371,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session,
     profile,
     isLoading,
+    isSigningOut,
     signOut,
     signIn,
   };
