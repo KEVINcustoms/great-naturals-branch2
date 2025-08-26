@@ -14,11 +14,13 @@ interface DashboardStats {
   unreadAlerts: number;
   totalInventoryValue: number;
   criticalAlerts: number;
+  todayRevenue: number;
   recentActivities: Array<{
     id: string;
     type: string;
     message: string;
     time: string;
+    timestamp: string;
   }>;
   totalActivities: number;
 }
@@ -43,6 +45,7 @@ export default function Dashboard() {
     unreadAlerts: 0,
     totalInventoryValue: 0,
     criticalAlerts: 0,
+    todayRevenue: 0,
     recentActivities: [],
     totalActivities: 0
   });
@@ -75,6 +78,11 @@ export default function Dashboard() {
         schema: 'public', 
         table: 'alerts' 
       }, () => fetchDashboardStats())
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'services' 
+      }, () => fetchDashboardStats())
       .subscribe();
 
     return () => {
@@ -91,7 +99,8 @@ export default function Dashboard() {
         { data: inventoryItems, error: inventoryError },
         { data: alerts, error: alertsError },
         { data: recentCustomers, error: recentCustomersError },
-        { data: recentTransactions, error: recentTransactionsError }
+        { data: recentTransactions, error: recentTransactionsError },
+        { data: todayServices, error: todayServicesError }
       ] = await Promise.all([
         supabase.from('customers').select('id'),
         supabase.from('workers').select('id'),
@@ -103,10 +112,11 @@ export default function Dashboard() {
           quantity,
           transaction_date,
           inventory_items(name)
-        `).order('transaction_date', { ascending: false }).limit(2)
+        `).order('transaction_date', { ascending: false }).limit(2),
+        supabase.from('services').select('service_price, date_time').gte('date_time', new Date().toISOString().split('T')[0]).lt('date_time', new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0])
       ]);
 
-      if (customersError || workersError || inventoryError || alertsError) {
+      if (customersError || workersError || inventoryError || alertsError || todayServicesError) {
         throw new Error('Failed to fetch dashboard data');
       }
 
@@ -123,12 +133,18 @@ export default function Dashboard() {
         total + (item.current_stock * item.unit_price), 0
       ) || 0;
 
+      // Calculate today's revenue
+      const todayRevenue = todayServices?.reduce((total, service) => 
+        total + (service.service_price || 0), 0
+      ) || 0;
+
       // Build recent activities
       const activities: Array<{
         id: string;
         type: string;
         message: string;
         time: string;
+        timestamp: string;
       }> = [];
 
       // Add recent customers
@@ -137,7 +153,8 @@ export default function Dashboard() {
           id: `customer-${index}`,
           type: 'customer',
           message: `New customer added: ${customer.name}`,
-          time: formatTimeAgo(customer.created_at)
+          time: formatTimeAgo(customer.created_at),
+          timestamp: customer.created_at
         });
       });
 
@@ -147,12 +164,13 @@ export default function Dashboard() {
           id: `transaction-${index}`,
           type: 'inventory',
           message: `Stock ${transaction.transaction_type === 'stock_in' ? 'added' : 'removed'}: ${transaction.inventory_items?.name || 'Unknown item'}`,
-          time: formatTimeAgo(transaction.transaction_date)
+          time: formatTimeAgo(transaction.transaction_date),
+          timestamp: transaction.transaction_date
         });
       });
 
-      // Sort activities by time (most recent first)
-      activities.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+      // Sort activities by actual timestamp (most recent first)
+      activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
       setStats({
         totalCustomers: customers?.length || 0,
@@ -161,6 +179,7 @@ export default function Dashboard() {
         unreadAlerts: unreadAlerts.length,
         totalInventoryValue,
         criticalAlerts: criticalAlerts.length,
+        todayRevenue,
         recentActivities: activities,
         totalActivities: activities.length
       });
@@ -450,7 +469,9 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
                               <div>
                   <p className="text-sm font-medium text-purple-700">Today's Revenue</p>
-                  <p className="text-2xl font-bold text-purple-900">{formatCurrency(0)}</p>
+                  <p className="text-2xl font-bold text-purple-900">
+                    {isLoading ? "..." : formatCurrency(stats.todayRevenue)}
+                  </p>
                 </div>
               <TrendingUp className="h-8 w-8 text-purple-500" />
             </div>
@@ -461,8 +482,15 @@ export default function Dashboard() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-blue-700">Appointments</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-sm font-medium text-blue-700">Appointments</p>
+                  <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-amber-100 text-amber-800 rounded-full border border-amber-200">
+                    <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
+                    Future Update
+                  </span>
+                </div>
                 <p className="text-2xl font-bold text-blue-900">0</p>
+                <p className="text-xs text-blue-600 mt-1">Coming soon from Devzora</p>
               </div>
               <Calendar className="h-8 w-8 text-blue-500" />
             </div>
