@@ -394,7 +394,7 @@ export default function AdminManagement() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-4 lg:p-6 space-y-4 lg:space-y-6 max-w-full">
       {/* Professional Notice */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-6">
         <div className="flex items-start gap-3">
@@ -454,7 +454,7 @@ export default function AdminManagement() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full"
                 />
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <Select value={roleFilter} onValueChange={setRoleFilter}>
                     <SelectTrigger>
                       <SelectValue placeholder="Role" />
@@ -523,17 +523,17 @@ export default function AdminManagement() {
           {selectedUser ? (
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div className="min-w-0">
                     <CardTitle className="flex items-center gap-2">
-                      {selectedUser.role === 'admin' ? <Shield className="h-5 w-5 text-blue-600" /> : <Users className="h-5 w-5" />}
-                      {selectedUser.full_name}
+                      {selectedUser.role === 'admin' ? <Shield className="h-5 w-5 text-blue-600 flex-shrink-0" /> : <Users className="h-5 w-5 flex-shrink-0" />}
+                      <span className="truncate">{selectedUser.full_name}</span>
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="truncate">
                       {selectedUser.email} • {selectedUser.role} • Member since {formatDate(selectedUser.created_at)}
                     </CardDescription>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <Badge className={getAccessLevelColor(selectedUser.access_level)}>
                       {getAccessLevelIcon(selectedUser.access_level)}
                       <span className="ml-1">
@@ -570,27 +570,27 @@ export default function AdminManagement() {
                     ) : userStats ? (
                       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                         <Card>
-                          <CardContent className="p-4 text-center">
-                            <div className="text-2xl font-bold text-blue-600">{userStats.total_services}</div>
-                            <p className="text-sm text-gray-600">Total Services</p>
+                          <CardContent className="p-3 lg:p-4 text-center">
+                            <div className="text-xl lg:text-2xl font-bold text-blue-600">{userStats.total_services}</div>
+                            <p className="text-xs lg:text-sm text-gray-600">Total Services</p>
                           </CardContent>
                         </Card>
                         <Card>
-                          <CardContent className="p-4 text-center">
-                            <div className="text-2xl font-bold text-green-600">{userStats.total_customers}</div>
-                            <p className="text-sm text-gray-600">Total Customers</p>
+                          <CardContent className="p-3 lg:p-4 text-center">
+                            <div className="text-xl lg:text-2xl font-bold text-green-600">{userStats.total_customers}</div>
+                            <p className="text-xs lg:text-sm text-gray-600">Total Customers</p>
                           </CardContent>
                         </Card>
                         <Card>
-                          <CardContent className="p-4 text-center">
-                            <div className="text-2xl font-bold text-purple-600">{formatCurrency(userStats.total_revenue)}</div>
-                            <p className="text-sm text-gray-600">Total Revenue</p>
+                          <CardContent className="p-3 lg:p-4 text-center">
+                            <div className="text-xl lg:text-2xl font-bold text-purple-600">{formatCurrency(userStats.total_revenue)}</div>
+                            <p className="text-xs lg:text-sm text-gray-600">Total Revenue</p>
                           </CardContent>
                         </Card>
                         <Card>
-                          <CardContent className="p-4 text-center">
-                            <div className="text-2xl font-bold text-orange-600">{formatCurrency(userStats.average_service_price)}</div>
-                            <p className="text-sm text-gray-600">Avg. Service Price</p>
+                          <CardContent className="p-3 lg:p-4 text-center">
+                            <div className="text-xl lg:text-2xl font-bold text-orange-600">{formatCurrency(userStats.average_service_price)}</div>
+                            <p className="text-xs lg:text-sm text-gray-600">Avg. Service Price</p>
                           </CardContent>
                         </Card>
                       </div>
