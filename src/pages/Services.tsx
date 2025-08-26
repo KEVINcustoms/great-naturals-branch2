@@ -1468,7 +1468,7 @@ export default function Services() {
 
               </div>
 
-                <div className="grid gap-2">
+              <div className="grid gap-2">
                   <Label htmlFor="staff_member_id" className="text-gray-700 font-medium">Staff Member</Label>
                   <Select
                     value={formData.staff_member_id}

@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Mail, CheckCircle } from "lucide-react";
 
 export function SignUpForm() {
   const [fullName, setFullName] = useState("");
@@ -15,13 +15,16 @@ export function SignUpForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
   const { toast } = useToast();
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
+    setSuccess(false);
 
+    // Validation
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       setIsLoading(false);
@@ -39,6 +42,15 @@ export function SignUpForm() {
       setIsLoading(false);
       return;
     }
+
+    // Check if email is the admin email
+    const isAdminEmail = email.toLowerCase() === 'devzoratech@gmail.com';
+    if (isAdminEmail) {
+      setError("This email is reserved for admin use only. Please use a different email address.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -47,12 +59,13 @@ export function SignUpForm() {
           data: {
             full_name: fullName,
           },
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/auth/confirm`,
         },
       });
 
       if (error) {
         console.error('Signup error:', error);
+        
         // Handle specific error cases
         if (error.message.includes('User already registered')) {
           setError("An account with this email already exists. Please try logging in instead.");
@@ -64,16 +77,21 @@ export function SignUpForm() {
           setError(`Signup failed: ${error.message}`);
         }
       } else if (data.user && !data.session) {
+        // Email confirmation required
+        setSuccess(true);
         toast({
-          title: "Account created!",
-          description: "Your account has been created successfully. You can now sign in.",
+          title: "Account created successfully!",
+          description: "Please check your email for verification link before signing in.",
         });
+        
         // Clear the form
         setFullName("");
         setEmail("");
         setPassword("");
         setConfirmPassword("");
       } else if (data.session) {
+        // Auto-confirmed (shouldn't happen with email confirmation enabled)
+        setSuccess(true);
         toast({
           title: "Welcome!",
           description: "Your account has been created successfully.",
@@ -86,6 +104,37 @@ export function SignUpForm() {
       setIsLoading(false);
     }
   };
+
+  if (success) {
+    return (
+      <div className="space-y-4 text-center">
+        <div className="flex justify-center">
+          <CheckCircle className="h-16 w-16 text-green-500" />
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900">Check your email</h3>
+        <p className="text-gray-600">
+          We've sent a verification link to <strong>{email}</strong>
+        </p>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center gap-2 text-blue-800">
+            <Mail className="h-4 w-4" />
+            <span className="text-sm font-medium">Email verification required</span>
+          </div>
+          <p className="text-sm text-blue-700 mt-1">
+            Click the link in your email to verify your account and start using the system.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setSuccess(false)}
+          className="w-full"
+        >
+          Sign up another account
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSignUp} className="space-y-4">
@@ -119,6 +168,9 @@ export function SignUpForm() {
           required
           disabled={isLoading}
         />
+        <p className="text-xs text-gray-500">
+          Note: Admin access is restricted. New users will have limited permissions.
+        </p>
       </div>
 
       <div className="space-y-2">

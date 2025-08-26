@@ -197,9 +197,11 @@ export default function Workers() {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-UG', {
       style: 'currency',
       currency: 'UGX',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(amount);
   };
 
@@ -212,19 +214,33 @@ export default function Workers() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Professional Notice */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div className="flex items-start gap-3">
+          <div className="p-2 bg-blue-100 rounded-full">
+            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-blue-900 mb-1">System Updates & Maintenance</h3>
+            <p className="text-sm text-blue-700 leading-relaxed">
+              This system is actively maintained and enhanced by <strong>Devzora Technologies</strong>. 
+              Future updates will include new features, security improvements, and performance optimizations. 
+              For technical support or feature requests, please contact our development team.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-            Workers
-          </h1>
-          <p className="text-muted-foreground">Manage your salon staff and team members</p>
+          <h1 className="text-3xl font-bold text-gray-900">Workers Management</h1>
+          <p className="text-gray-600">Manage your salon staff and their schedules</p>
         </div>
-        <Button 
-          onClick={() => setIsDialogOpen(true)}
-          className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-        >
-          <Plus className="mr-2 h-4 w-4" />
+        <Button onClick={() => setIsDialogOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
           Add Worker
         </Button>
       </div>

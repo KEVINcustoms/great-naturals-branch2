@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, ReactNode 
 import { User, Session, AuthError, PostgrestError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-interface Profile {
+export interface Profile {
   id: string;
   user_id: string;
   email: string;
@@ -10,6 +10,8 @@ interface Profile {
   role: 'admin' | 'user';
   created_at: string;
   updated_at: string;
+  is_active?: boolean;
+  access_level?: 'full' | 'restricted' | 'banned';
 }
 
 interface UserMetadata {
@@ -22,6 +24,7 @@ interface AuthContextType {
   profile: Profile | null;
   isLoading: boolean;
   signOut: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<{ data: any; error: any } | { data: null; error: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -290,12 +293,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      // After successful authentication, check user access level
+      if (data.user) {
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('is_active, access_level')
+            .eq('user_id', data.user.id)
+            .single();
+
+          if (profileError) {
+            // If columns don't exist yet, allow login (default behavior)
+            console.log('Access control columns not found, allowing login with default permissions');
+            return { data, error: null };
+          }
+
+          // Check if user is banned or restricted
+          if (profile.access_level === 'banned') {
+            // Sign out the user immediately
+            await supabase.auth.signOut();
+            throw new Error('Your account has been banned from the system. Please contact an administrator for more information.');
+          }
+
+          if (profile.access_level === 'restricted') {
+            // Sign out the user immediately
+            await supabase.auth.signOut();
+            throw new Error('Your account access has been restricted. Please contact an administrator for more information.');
+          }
+
+          if (profile.is_active === false) {
+            // Sign out the user immediately
+            await supabase.auth.signOut();
+            throw new Error('Your account has been deactivated. Please contact an administrator for more information.');
+          }
+        } catch (accessCheckError) {
+          // If access check fails, allow login (default behavior)
+          console.log('Access control check failed, allowing login with default permissions');
+          return { data, error: null };
+        }
+      }
+
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
+  };
+
   const value = {
     user,
     session,
     profile,
     isLoading,
     signOut,
+    signIn,
   };
 
   return (

@@ -27,11 +27,14 @@ export default function Dashboard() {
   const { toast } = useToast();
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-UG', {
       style: 'currency',
       currency: 'UGX',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(amount);
   };
+
   const [stats, setStats] = useState<DashboardStats>({
     totalCustomers: 0,
     totalWorkers: 0,
@@ -196,14 +199,31 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="text-center space-y-2">
-        <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-          Dashboard
-        </h1>
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Welcome back, <span className="font-semibold text-indigo-600">{profile?.full_name}</span>! Here's what's happening at your salon today.
-        </p>
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Professional Notice */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div className="flex items-start gap-3">
+          <div className="p-2 bg-blue-100 rounded-full">
+            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-blue-900 mb-1">System Updates & Maintenance</h3>
+            <p className="text-sm text-blue-700 leading-relaxed">
+              This system is actively maintained and enhanced by <strong>Devzora Technologies</strong>. 
+              Future updates will include new features, security improvements, and performance optimizations. 
+              For technical support or feature requests, please contact our development team.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-600">Welcome to your salon management dashboard</p>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -336,12 +356,12 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="p-6">
             <div className="space-y-6">
-              <div className="text-center p-4 bg-emerald-100 rounded-lg">
-                <div className="text-3xl font-bold text-emerald-900">
-                  {isLoading ? "..." : formatCurrency(stats.totalInventoryValue)}
+                              <div className="text-center p-4 bg-emerald-100 rounded-lg">
+                  <div className="text-3xl font-bold text-emerald-900">
+                    {isLoading ? "..." : formatCurrency(stats.totalInventoryValue)}
+                  </div>
+                  <p className="text-sm text-emerald-700 font-medium">Current stock value</p>
                 </div>
-                <p className="text-sm text-emerald-700 font-medium">Current stock value</p>
-              </div>
               <div className="space-y-3">
                 <Button 
                   variant="outline" 
@@ -387,10 +407,10 @@ export default function Dashboard() {
         <Card className="border-0 shadow-md bg-gradient-to-r from-purple-50 to-pink-50">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-purple-700">Today's Revenue</p>
-                <p className="text-2xl font-bold text-purple-900">{formatCurrency(0)}</p>
-              </div>
+                              <div>
+                  <p className="text-sm font-medium text-purple-700">Today's Revenue</p>
+                  <p className="text-2xl font-bold text-purple-900">{formatCurrency(0)}</p>
+                </div>
               <TrendingUp className="h-8 w-8 text-purple-500" />
             </div>
           </CardContent>

@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { AuthPage } from "@/components/auth/AuthPage";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -15,8 +15,25 @@ import Inventory from "./pages/Inventory";
 import Alerts from "./pages/Alerts";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import { AccessDenied } from "./components/ui/AccessDenied";
+import AdminManagement from "./pages/AdminManagement";
+import { EmailConfirmation } from "./components/auth/EmailConfirmation";
+import { Profile } from "@/hooks/useAuth";
+import { isAdmin } from "@/utils/permissions";
+import { AccessControl } from "@/components/ui/AccessControl";
 
 const queryClient = new QueryClient();
+
+// Protected Route Component for Admin-only access
+function AdminRoute({ children, profile }: { children: React.ReactNode; profile: Profile | null }) {
+  if (!isAdmin(profile)) {
+    return <AccessDenied 
+      title="Admin Access Required"
+      description="This section is only available to administrators. Regular users can manage services, customers, products, and inventory."
+    />;
+  }
+  return <>{children}</>;
+}
 
 function AppContent() {
   const { user, profile, isLoading } = useAuth();
@@ -50,22 +67,48 @@ function AppContent() {
     );
   }
 
-  // User and profile exist, show main app
+  // User and profile exist, show main app with access control
   return (
-    <AppLayout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/services" element={<Services />} />
-        <Route path="/products" element={<Products />} />
-        <Route path="/customers" element={<Customers />} />
-        <Route path="/workers" element={<Workers />} />
-        <Route path="/inventory" element={<Inventory />} />
-        <Route path="/alerts" element={<Alerts />} />
-        <Route path="/settings" element={<Settings />} />
-        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </AppLayout>
+    <AccessControl profile={profile}>
+      <AppLayout>
+        <Routes>
+          {/* Admin-only routes */}
+          <Route path="/" element={
+            <AdminRoute profile={profile}>
+              <Dashboard />
+            </AdminRoute>
+          } />
+          <Route path="/workers" element={
+            <AdminRoute profile={profile}>
+              <Workers />
+            </AdminRoute>
+          } />
+          <Route path="/admin" element={
+            <AdminRoute profile={profile}>
+              <AdminManagement />
+            </AdminRoute>
+          } />
+          <Route path="/settings" element={
+            <AdminRoute profile={profile}>
+              <Settings />
+            </AdminRoute>
+          } />
+          
+          {/* User-accessible routes */}
+          <Route path="/services" element={<Services />} />
+          <Route path="/products" element={<Products />} />
+          <Route path="/customers" element={<Customers />} />
+          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/alerts" element={<Alerts />} />
+          
+          {/* Redirect root to services for non-admin users */}
+          <Route path="/dashboard" element={<Navigate to="/services" replace />} />
+          
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </AppLayout>
+    </AccessControl>
   );
 }
 
@@ -76,7 +119,13 @@ const App = () => (
       <Sonner />
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider>
-          <AppContent />
+          <Routes>
+            {/* Public routes that don't require authentication */}
+            <Route path="/auth/confirm" element={<EmailConfirmation />} />
+            
+            {/* Protected routes */}
+            <Route path="/*" element={<AppContent />} />
+          </Routes>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
