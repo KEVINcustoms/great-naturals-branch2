@@ -42,12 +42,19 @@ interface Worker {
   name: string;
 }
 
-interface Product {
+interface InventoryItem {
   id: string;
   name: string;
-  unit_price?: number;
-  price?: number;
-  cost?: number;
+  current_stock: number;
+  min_stock_level: number;
+  max_stock_level: number;
+  unit_price: number;
+  expiry_date: string | null;
+  supplier: string | null;
+  barcode: string | null;
+  category_id: string | null;
+  created_at: string;
+  created_by: string;
 }
 
 interface ServiceProduct {
@@ -60,7 +67,7 @@ export default function Services() {
   const [services, setServices] = useState<Service[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
@@ -94,7 +101,7 @@ export default function Services() {
 
   const fetchData = async () => {
     try {
-      const [servicesResponse, customersResponse, workersResponse, productsResponse] = await Promise.all([
+      const [servicesResponse, customersResponse, workersResponse, inventoryResponse] = await Promise.all([
         supabase
           .from("services")
           .select(`
@@ -105,13 +112,13 @@ export default function Services() {
           .order("created_at", { ascending: false }),
         supabase.from("customers").select("*").order("name"),
         supabase.from("workers").select("*").order("name"),
-        supabase.from("products").select("*").order("name")
+        supabase.from("inventory_items").select("*").order("name")
       ]);
 
       if (servicesResponse.error) throw servicesResponse.error;
       if (customersResponse.error) throw customersResponse.error;
       if (workersResponse.error) throw workersResponse.error;
-      if (productsResponse.error) throw productsResponse.error;
+      if (inventoryResponse.error) throw inventoryResponse.error;
 
       // Transform the services data to match our interface
       const transformedServices = (servicesResponse.data || []).map(service => ({
@@ -123,13 +130,13 @@ export default function Services() {
       setCustomers(customersResponse.data || []);
       setWorkers(workersResponse.data || []);
       
-      // Handle products data with better error handling
-      if (productsResponse.data && productsResponse.data.length > 0) {
-        setProducts(productsResponse.data);
-        console.log('Fetched products:', productsResponse.data);
+      // Handle inventory data with better error handling
+      if (inventoryResponse.data && inventoryResponse.data.length > 0) {
+        setInventoryItems(inventoryResponse.data);
+        console.log('Fetched inventory items:', inventoryResponse.data);
       } else {
-        console.warn('No products found or products table is empty');
-        setProducts([]);
+        console.warn('No inventory items found or inventory_items table is empty');
+        setInventoryItems([]);
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -455,10 +462,7 @@ export default function Services() {
     setServiceProducts([...serviceProducts, newProduct]);
   };
 
-  // Helper function to get product price
-  const getProductPrice = (product: Product) => {
-    return product.unit_price || product.price || product.cost || 0;
-  };
+
 
   const updateServiceProduct = (index: number, field: keyof ServiceProduct, value: string | number) => {
     const updated = [...serviceProducts];
@@ -850,14 +854,14 @@ export default function Services() {
               </div>
               </div>
 
-              {/* Products Section */}
+              {/* Inventory Items Section */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label className="text-gray-700 font-medium">Products Used</Label>
-                    {products.length === 0 && (
+                    <Label className="text-gray-700 font-medium">Inventory Items Used</Label>
+                    {inventoryItems.length === 0 && (
                       <p className="text-sm text-amber-600 mt-1">
-                        ⚠️ No products available. Please add products in the Products tab first.
+                        ⚠️ No inventory items available. Please add items in the Inventory tab first.
                       </p>
                     )}
                   </div>
@@ -866,16 +870,24 @@ export default function Services() {
                     variant="outline"
                     size="sm"
                     onClick={addServiceProduct}
-                    disabled={products.length === 0}
+                    disabled={inventoryItems.length === 0}
                     className="text-blue-600 border-blue-300 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Plus className="h-4 w-4 mr-2" />
-                    Add Product
+                    Add Inventory Item
                   </Button>
                 </div>
                 
                 {serviceProducts.length > 0 && (
                   <div className="space-y-3">
+                    {/* Table Headers */}
+                    <div className="grid grid-cols-12 gap-3 p-3 bg-gray-100 rounded-lg border border-gray-200">
+                      <div className="col-span-4 font-medium text-gray-700">Inventory Item</div>
+                      <div className="col-span-2 font-medium text-gray-700">Quantity</div>
+                      <div className="col-span-2 font-medium text-gray-700">Price</div>
+                      <div className="col-span-2 font-medium text-gray-700">Total</div>
+                      <div className="col-span-2 font-medium text-gray-700">Actions</div>
+                    </div>
                                          {serviceProducts.map((product, index) => (
                        <div key={index} className={`grid grid-cols-12 gap-3 p-3 rounded-lg border ${
                          !product.product_id ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'
@@ -884,44 +896,40 @@ export default function Services() {
                           <Select
                             value={product.product_id}
                                                          onValueChange={(value) => {
-                               console.log('Product selected:', value);
-                               const selectedProduct = products.find(p => p.id === value);
-                               console.log('Selected product:', selectedProduct);
+                               console.log('Inventory item selected:', value);
+                               const selectedItem = inventoryItems.find(item => item.id === value);
+                               console.log('Selected inventory item:', selectedItem);
                                
-                               if (selectedProduct) {
-                                 const price = getProductPrice(selectedProduct);
-                                 console.log('Setting price:', price);
+                               if (selectedItem) {
+                                 console.log('Setting price:', selectedItem.unit_price);
                                  
                                  // Update both product_id and price_per_unit atomically
                                  const updated = [...serviceProducts];
                                  updated[index] = {
                                    ...updated[index],
                                    product_id: value,
-                                   price_per_unit: price
+                                   price_per_unit: selectedItem.unit_price
                                  };
                                  setServiceProducts(updated);
                                } else {
-                                 // Just update the product_id if no product found
+                                 // Just update the product_id if no item found
                                  updateServiceProduct(index, 'product_id', value);
                                }
                              }}
                           >
                             <SelectTrigger className="border-gray-200 focus:border-blue-400 focus:ring-blue-400">
-                              <SelectValue placeholder="Select product" />
+                              <SelectValue placeholder="Select inventory item" />
                             </SelectTrigger>
                             <SelectContent>
-                                                             {products.length > 0 ? (
-                                 products.map((p) => {
-                                   const price = getProductPrice(p);
-                                   return (
-                                     <SelectItem key={p.id} value={p.id}>
-                                                                               {p.name} - {formatCurrency(price)}
-                                     </SelectItem>
-                                   );
-                                 })
-                               ) : (
+                              {inventoryItems.length > 0 ? (
+                                inventoryItems.map((item) => (
+                                  <SelectItem key={item.id} value={item.id}>
+                                    {item.name} - {formatCurrency(item.unit_price)} (Stock: {item.current_stock})
+                                  </SelectItem>
+                                ))
+                              ) : (
                                 <SelectItem value="" disabled>
-                                  No products available
+                                  No inventory items available
                                 </SelectItem>
                               )}
                             </SelectContent>
@@ -966,12 +974,12 @@ export default function Services() {
                       </div>
                     ))}
                     
-                    <div className="flex justify-end">
+                                        <div className="flex justify-end">
                       <div className="text-right">
-                        <div className="text-sm text-gray-600">Total Products:</div>
-                                                 <div className="text-lg font-semibold text-blue-600">
-                           {formatCurrency(serviceProducts.reduce((total, product) => total + (product.quantity * product.price_per_unit), 0))}
-                         </div>
+                        <div className="text-sm text-gray-600">Total Inventory Items:</div>
+                        <div className="text-lg font-semibold text-blue-600">
+                          {formatCurrency(serviceProducts.reduce((total, product) => total + (product.quantity * product.price_per_unit), 0))}
+                        </div>
                       </div>
                     </div>
                   </div>

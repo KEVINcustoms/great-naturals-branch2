@@ -66,7 +66,6 @@ export const canAccessFeature = (profile: Profile | null, feature: string): bool
     // User-accessible features
     'services': ['admin', 'user'],
     'customers': ['admin', 'user'],
-    'products': ['admin', 'user'],
     'inventory': ['admin', 'user'],
     'alerts': ['admin', 'user'],
     'reports': ['admin', 'user'],
@@ -123,14 +122,7 @@ export const canManageCustomers = (profile: Profile | null): boolean => {
   return canAccessFeature(profile, 'customers');
 };
 
-/**
- * Check if user can manage products
- * @param profile - User profile object
- * @returns boolean indicating if user can manage products
- */
-export const canManageProducts = (profile: Profile | null): boolean => {
-  return canAccessFeature(profile, 'products');
-};
+
 
 /**
  * Check if user can manage inventory

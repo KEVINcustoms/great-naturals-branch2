@@ -32,7 +32,6 @@ import { getUserRoleDisplay, isAdmin } from "@/utils/permissions";
 const allMenuItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard, adminOnly: true },
   { title: "Services", url: "/services", icon: ClipboardList, adminOnly: false },
-  { title: "Products", url: "/products", icon: ShoppingBag, adminOnly: false },
   { title: "Customers", url: "/customers", icon: Users, adminOnly: false },
   { title: "Workers", url: "/workers", icon: UserCheck, adminOnly: true },
   { title: "Inventory", url: "/inventory", icon: Package, adminOnly: false },

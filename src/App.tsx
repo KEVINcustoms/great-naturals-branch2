@@ -8,7 +8,6 @@ import { AuthPage } from "@/components/auth/AuthPage";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Services from "./pages/Services";
-import Products from "./pages/Products";
 import Customers from "./pages/Customers";
 import Workers from "./pages/Workers";
 import Inventory from "./pages/Inventory";
@@ -29,7 +28,7 @@ function AdminRoute({ children, profile }: { children: React.ReactNode; profile:
   if (!isAdmin(profile)) {
     return <AccessDenied 
       title="Admin Access Required"
-      description="This section is only available to administrators. Regular users can manage services, customers, products, and inventory."
+      description="This section is only available to administrators. Regular users can manage services, customers, and inventory."
     />;
   }
   return <>{children}</>;
@@ -96,7 +95,6 @@ function AppContent() {
           
           {/* User-accessible routes */}
           <Route path="/services" element={<Services />} />
-          <Route path="/products" element={<Products />} />
           <Route path="/customers" element={<Customers />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/alerts" element={<Alerts />} />

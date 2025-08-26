@@ -25,7 +25,7 @@ interface ServiceProduct {
   quantity: number;
   price_per_unit: number;
   total_price: number;
-  products: { name: string };
+  inventory_items: { name: string };
 }
 
 interface ReceiptDialogProps {
@@ -53,7 +53,7 @@ export function ReceiptDialog({ isOpen, onClose, service }: ReceiptDialogProps) 
         .from("service_products")
         .select(`
           *,
-          products (name)
+          inventory_items (name)
         `)
         .eq("service_id", service.id);
 
@@ -135,7 +135,7 @@ export function ReceiptDialog({ isOpen, onClose, service }: ReceiptDialogProps) 
               ) : (
                 serviceProducts.map((sp, index) => (
                   <div key={index} className="flex justify-between text-sm">
-                    <span>{sp.products.name} x {sp.quantity}</span>
+                    <span>{sp.inventory_items.name} x {sp.quantity}</span>
                     <span>{formatCurrency(sp.total_price)}</span>
                   </div>
                 ))
