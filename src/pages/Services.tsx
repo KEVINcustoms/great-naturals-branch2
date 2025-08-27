@@ -74,6 +74,7 @@ export default function Services() {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
   const [isNewCustomer, setIsNewCustomer] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -388,6 +389,7 @@ export default function Services() {
     });
     setServiceProducts([]);
     setIsNewCustomer(false);
+    setCustomerSearchQuery("");
   };
 
   const openDialog = async (service?: Service) => {
@@ -714,22 +716,58 @@ export default function Services() {
               {!isNewCustomer ? (
                 <div className="grid gap-2">
                   <Label htmlFor="customer_id" className="text-gray-700 font-medium">Select Customer *</Label>
-                  <Select
-                    value={formData.customer_id}
-                    onValueChange={(value) => setFormData({ ...formData, customer_id: value })}
-                    required
-                  >
-                    <SelectTrigger className="border-gray-200 focus:border-blue-400 focus:ring-blue-400">
-                      <SelectValue placeholder="Choose a customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {customers.map((customer) => (
-                        <SelectItem key={customer.id} value={customer.id}>
-                          {customer.name} {customer.email && `(${customer.email})`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  
+                  {/* Searchable Customer Dropdown */}
+                  <div className="relative">
+                    <Input
+                      placeholder="Search customers by name or email..."
+                      value={customerSearchQuery}
+                      onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                      className="border-gray-200 focus:border-blue-400 focus:ring-blue-400 mb-2"
+                    />
+                    
+                    <div className="relative">
+                      <Select
+                        value={formData.customer_id}
+                        onValueChange={(value) => {
+                          setFormData({ ...formData, customer_id: value });
+                          setCustomerSearchQuery(""); // Clear search when customer is selected
+                        }}
+                        required
+                      >
+                        <SelectTrigger className="border-gray-200 focus:border-blue-400 focus:ring-blue-400">
+                          <SelectValue placeholder="Choose a customer" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60">
+                          {customers
+                            .filter(customer => 
+                              customer.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+                              (customer.email && customer.email.toLowerCase().includes(customerSearchQuery.toLowerCase()))
+                            )
+                            .map((customer) => (
+                              <SelectItem key={customer.id} value={customer.id}>
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{customer.name}</span>
+                                  {customer.email && (
+                                    <span className="text-xs text-gray-500">{customer.email}</span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {/* Search Results Count */}
+                    {customerSearchQuery && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {customers.filter(customer => 
+                          customer.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+                          (customer.email && customer.email.toLowerCase().includes(customerSearchQuery.toLowerCase()))
+                        ).length} customer(s) found
+                      </p>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-4">

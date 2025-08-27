@@ -9,6 +9,7 @@ import greatNaturalsLogo from "@/assets/great-naturals-logo.png";
 import hairShowcase from "@/assets/hair_shocase.jpg";
 import salonProducts from "@/assets/saloon_products.jpg";
 import rightColumnBg from "@/assets/right_column_bg.jpg";
+import saloon_award from "@/assets/saloon_award.jpg";
 
 export function AuthPage() {
   const [activeTab, setActiveTab] = useState("login");
@@ -112,8 +113,8 @@ export function AuthPage() {
               </p>
             </div>
 
-            {/* Salon Showcase Gallery - Reduced to 2 cards for better balance */}
-            <div className="grid grid-cols-2 gap-6 mb-8">
+            {/* Salon Showcase Gallery - Now 3 cards including the award */}
+            <div className="grid grid-cols-3 gap-4 mb-8">
               {/* Hair Showcase */}
               <div className="bg-gradient-to-br from-blue-600/20 to-cyan-600/20 rounded-2xl p-6 border border-blue-500/30 backdrop-blur-sm">
                 <div className="w-full h-40 rounded-xl mb-4 overflow-hidden">
@@ -138,6 +139,19 @@ export function AuthPage() {
                 </div>
                 <h3 className="text-white font-semibold text-center text-lg">Premium Products</h3>
                 <p className="text-purple-200 text-sm text-center">High-quality beauty essentials</p>
+              </div>
+
+              {/* Salon Award */}
+              <div className="bg-gradient-to-br from-amber-600/20 to-orange-600/20 rounded-2xl p-6 border border-amber-500/30 backdrop-blur-sm">
+                <div className="w-full h-40 rounded-xl mb-4 overflow-hidden">
+                  <img 
+                    src={saloon_award} 
+                    alt="Salon Excellence Award" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <h3 className="text-white font-semibold text-center text-lg">Excellence Award</h3>
+                <p className="text-amber-200 text-sm text-center">Recognized for outstanding service</p>
               </div>
             </div>
 

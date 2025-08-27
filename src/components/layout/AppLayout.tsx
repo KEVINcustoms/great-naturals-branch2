@@ -97,12 +97,12 @@ export function AppLayout({ children }: AppLayoutProps) {
                     </div>
                     <div>
                       <p className="text-sm text-blue-700">
-                        <strong>Kevin Customs</strong> - Active system maintenance and future updates
+                        <strong>KEVINcustoms</strong> - Active system maintenance and future updates
                       </p>
                     </div>
                   </div>
                   <div className="text-xs text-blue-600">
-                    v1.0.0 • Powered by kevinCustom
+                    v1.0.0 • Powered by KEVINcustom
                   </div>
                 </div>
               </div>
