@@ -122,3 +122,4 @@ export function AccessControl({ profile, children, fallback }: AccessControlProp
   // User has proper access, render children
   return <>{children}</>;
 }
+

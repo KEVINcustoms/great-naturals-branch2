@@ -406,7 +406,7 @@ export default function AdminManagement() {
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-blue-900 mb-1">System Updates & Maintenance</h3>
             <p className="text-sm text-blue-700 leading-relaxed">
-              This system is actively maintained and enhanced by <strong>Devzora Technologies</strong>. 
+              This system is actively maintained and enhanced by <strong>Our Team</strong>. 
               Future updates will include new features, security improvements, and performance optimizations. 
               For technical support or feature requests, please contact our development team.
             </p>
@@ -422,7 +422,7 @@ export default function AdminManagement() {
           <div className="mt-2 inline-flex items-center gap-2 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-full px-3 py-1">
             <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
             <span className="text-xs font-medium text-purple-700">
-              Enhanced features coming in future updates from Devzora Technologies
+              Enhanced features coming in future updates from Our Team
             </span>
           </div>
         </div>
@@ -432,7 +432,7 @@ export default function AdminManagement() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 lg:gap-6">
         {/* Users List */}
         <div className="xl:col-span-1">
           <Card>
@@ -568,7 +568,7 @@ export default function AdminManagement() {
                         <p className="text-sm text-gray-500">Loading statistics...</p>
                       </div>
                     ) : userStats ? (
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         <Card>
                           <CardContent className="p-3 lg:p-4 text-center">
                             <div className="text-xl lg:text-2xl font-bold text-blue-600">{userStats.total_services}</div>
@@ -635,30 +635,30 @@ export default function AdminManagement() {
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Service</TableHead>
-                              <TableHead>Customer</TableHead>
-                              <TableHead>Price</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead>Date</TableHead>
+                              <TableHead className="text-xs sm:text-sm">Service</TableHead>
+                              <TableHead className="text-xs sm:text-sm">Customer</TableHead>
+                              <TableHead className="text-xs sm:text-sm">Price</TableHead>
+                              <TableHead className="text-xs sm:text-sm">Status</TableHead>
+                              <TableHead className="text-xs sm:text-sm">Date</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {userServices.map((service) => (
                               <TableRow key={service.id}>
-                                <TableCell>
+                                <TableCell className="text-xs sm:text-sm">
                                   <div>
                                     <p className="font-medium">{service.service_name}</p>
-                                    <p className="text-sm text-gray-500">{service.service_category}</p>
+                                    <p className="text-xs text-gray-500">{service.service_category}</p>
                                   </div>
                                 </TableCell>
-                                <TableCell>{service.customer_name}</TableCell>
-                                <TableCell>{formatCurrency(service.service_price)}</TableCell>
+                                <TableCell className="text-xs sm:text-sm">{service.customer_name}</TableCell>
+                                <TableCell className="text-xs sm:text-sm">{formatCurrency(service.service_price)}</TableCell>
                                 <TableCell>
-                                  <Badge variant={service.status === 'completed' ? 'default' : 'secondary'}>
+                                  <Badge variant={service.status === 'completed' ? 'default' : 'secondary'} className="text-xs">
                                     {service.status}
                                   </Badge>
                                 </TableCell>
-                                <TableCell>{formatDate(service.date_time)}</TableCell>
+                                <TableCell className="text-xs sm:text-sm">{formatDate(service.date_time)}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
@@ -685,21 +685,21 @@ export default function AdminManagement() {
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Name</TableHead>
-                              <TableHead>Contact</TableHead>
-                              <TableHead>Preferences</TableHead>
-                              <TableHead>Created</TableHead>
+                              <TableHead className="text-xs sm:text-sm">Name</TableHead>
+                              <TableHead className="text-xs sm:text-sm">Contact</TableHead>
+                              <TableHead className="text-xs sm:text-sm">Preferences</TableHead>
+                              <TableHead className="text-xs sm:text-sm">Created</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {userCustomers.map((customer) => (
                               <TableRow key={customer.id}>
-                                <TableCell>
+                                <TableCell className="text-xs sm:text-sm">
                                   <div>
                                     <p className="font-medium">{customer.name}</p>
                                   </div>
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="text-xs sm:text-sm">
                                   <div className="space-y-1">
                                     {customer.email && (
                                       <div className="flex items-center gap-1 text-sm">
@@ -715,7 +715,7 @@ export default function AdminManagement() {
                                     )}
                                   </div>
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="text-xs sm:text-sm">
                                   <div className="space-y-1">
                                     {customer.hair_type && (
                                       <div className="flex items-center gap-1 text-sm">
@@ -731,7 +731,7 @@ export default function AdminManagement() {
                                     )}
                                   </div>
                                 </TableCell>
-                                <TableCell>{formatDate(customer.created_at)}</TableCell>
+                                <TableCell className="text-xs sm:text-sm">{formatDate(customer.created_at)}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
@@ -812,7 +812,7 @@ export default function AdminManagement() {
                 <div className="flex-1">
                   <p className="text-xs font-medium text-amber-800 mb-1">Coming Soon - Enhanced Access Control</p>
                   <p className="text-xs text-amber-700 leading-relaxed">
-                    Future updates from <strong>Devzora Technologies</strong> will include advanced user management features, 
+                    Future updates from <strong>Our Team</strong> will include advanced user management features, 
                     detailed access logs, temporary restrictions, and automated compliance monitoring.
                   </p>
                 </div>
