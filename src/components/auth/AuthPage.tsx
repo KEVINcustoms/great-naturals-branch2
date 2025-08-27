@@ -209,7 +209,7 @@ export function AuthPage() {
               <div className="space-y-2 text-sm">
                 <div className="flex items-center space-x-2">
                   <Mail className="w-4 h-4 text-blue-400" />
-                  <span className="text-gray-400">kevincustom1@gmail.com</span>
+                  <span className="text-gray-400">kevincustoms1@gmail.com</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Phone className="w-4 h-4 text-blue-400" />
@@ -227,7 +227,7 @@ export function AuthPage() {
               <h3 className="font-semibold text-base">Company</h3>
               <div className="space-y-2 text-sm">
                 <div className="text-gray-400">
-                  <p className="font-medium text-white">KEVINcustom</p>
+                  <p className="font-medium text-white">KEVINcustoms</p>
                   <p>Leading software solutions</p>
                 </div>
                 <div className="text-gray-400">
@@ -241,7 +241,7 @@ export function AuthPage() {
           {/* Bottom Bar */}
           <div className="border-t border-gray-800 mt-6 pt-6 flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400 text-sm">
-              © 2025 KEVINcustom. All rights reserved.
+              © 2025 KEVINcustoms. All rights reserved.
             </p>
             <div className="flex space-x-4 mt-2 md:mt-0">
               <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">Privacy Policy</a>
