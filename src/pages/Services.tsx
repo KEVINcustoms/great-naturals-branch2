@@ -74,7 +74,6 @@ export default function Services() {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
   const [isNewCustomer, setIsNewCustomer] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -92,6 +91,7 @@ export default function Services() {
   });
 
   const [serviceProducts, setServiceProducts] = useState<ServiceProduct[]>([]);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
   
   const { user } = useAuth();
   const { toast } = useToast();
@@ -389,7 +389,6 @@ export default function Services() {
     });
     setServiceProducts([]);
     setIsNewCustomer(false);
-    setCustomerSearchQuery("");
   };
 
   const openDialog = async (service?: Service) => {
@@ -723,43 +722,60 @@ export default function Services() {
                       placeholder="Search customers by name or email..."
                       value={customerSearchQuery}
                       onChange={(e) => setCustomerSearchQuery(e.target.value)}
-                      className="border-gray-200 focus:border-blue-400 focus:ring-blue-400 mb-2"
+                      className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
                     />
                     
-                    <div className="relative">
-                      <Select
-                        value={formData.customer_id}
-                        onValueChange={(value) => {
-                          setFormData({ ...formData, customer_id: value });
-                          setCustomerSearchQuery(""); // Clear search when customer is selected
-                        }}
-                        required
-                      >
-                        <SelectTrigger className="border-gray-200 focus:border-blue-400 focus:ring-blue-400">
-                          <SelectValue placeholder="Choose a customer" />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-60">
-                          {customers
-                            .filter(customer => 
-                              customer.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
-                              (customer.email && customer.email.toLowerCase().includes(customerSearchQuery.toLowerCase()))
-                            )
-                            .map((customer) => (
-                              <SelectItem key={customer.id} value={customer.id}>
-                                <div className="flex flex-col">
-                                  <span className="font-medium">{customer.name}</span>
-                                  {customer.email && (
-                                    <span className="text-xs text-gray-500">{customer.email}</span>
-                                  )}
-                                </div>
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {/* Dropdown Results - Only show when searching and no customer selected */}
+                    {customerSearchQuery && !formData.customer_id && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {customers
+                          .filter(customer => 
+                            customer.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+                            (customer.email && customer.email.toLowerCase().includes(customerSearchQuery.toLowerCase()))
+                          )
+                          .map((customer) => (
+                            <div
+                              key={customer.id}
+                              onClick={() => {
+                                setFormData({ ...formData, customer_id: customer.id });
+                                setCustomerSearchQuery(customer.name); // Show selected customer name
+                              }}
+                              className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors duration-150"
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-medium text-gray-900">{customer.name}</span>
+                                {customer.email && (
+                                  <span className="text-xs text-gray-500">{customer.email}</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        
+                        {/* No Results Message */}
+                        {customers.filter(customer => 
+                          customer.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+                          (customer.email && customer.email.toLowerCase().includes(customerSearchQuery.toLowerCase()))
+                        ).length === 0 && (
+                          <div className="px-4 py-3 text-gray-500 text-center">
+                            No customers found matching "{customerSearchQuery}"
+                          </div>
+                        )}
+                      </div>
+                    )}
                     
-                    {/* Search Results Count */}
-                    {customerSearchQuery && (
+                    {/* Selected Customer Display */}
+                    {formData.customer_id && (
+                      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm text-blue-800">
+                          <span className="font-medium">Selected:</span> {
+                            customers.find(c => c.id === formData.customer_id)?.name || 'Unknown Customer'
+                          }
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Search Results Count - Only show when searching and no customer selected */}
+                    {customerSearchQuery && !formData.customer_id && (
                       <p className="text-xs text-gray-500 mt-1">
                         {customers.filter(customer => 
                           customer.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
@@ -1064,587 +1080,4 @@ export default function Services() {
       />
     </div>
   );
-
-  return (
-
-    <div className="space-y-6">
-
-      <div className="flex items-center justify-between">
-
-        <div>
-
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-
-            Services
-
-          </h1>
-
-          <p className="text-muted-foreground">Manage salon services and appointments</p>
-
-        </div>
-
-        <Button 
-
-          onClick={() => openDialog()}
-
-          className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-
-        >
-
-          <Plus className="mr-2 h-4 w-4" />
-
-          New Service
-
-        </Button>
-
-      </div>
-
-
-
-      <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-blue-50/50">
-
-        <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-blue-100">
-
-          <CardTitle className="text-blue-800">Service Directory</CardTitle>
-
-          <CardDescription className="text-blue-600">
-
-            View and manage all salon services and appointments
-
-          </CardDescription>
-
-          <div className="flex items-center space-x-2">
-
-            <Search className="h-4 w-4 text-blue-500" />
-
-            <Input
-
-              placeholder="Search services..."
-
-              value={searchQuery}
-
-              onChange={(e) => setSearchQuery(e.target.value)}
-
-              className="max-w-sm border-blue-200 focus:border-blue-400 focus:ring-blue-400"
-
-            />
-
-          </div>
-
-        </CardHeader>
-
-        <CardContent className="p-6">
-
-          {isLoading ? (
-
-            <div className="flex items-center justify-center py-8">
-
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-
-            </div>
-
-          ) : (
-
-            <Table>
-
-              <TableHeader>
-
-                <TableRow className="bg-gradient-to-r from-blue-50 to-cyan-50 hover:bg-gradient-to-r hover:from-blue-100 hover:to-cyan-100">
-
-                  <TableHead className="text-blue-800 font-semibold">Customer</TableHead>
-
-                  <TableHead className="text-blue-800 font-semibold">Service</TableHead>
-
-                  <TableHead className="text-blue-800 font-semibold">Category</TableHead>
-
-                  <TableHead className="text-blue-800 font-semibold">Staff</TableHead>
-
-                  <TableHead className="text-blue-800 font-semibold">Status</TableHead>
-
-                  <TableHead className="text-blue-800 font-semibold">Date & Time</TableHead>
-
-                  <TableHead className="text-blue-800 font-semibold">Price</TableHead>
-
-                  <TableHead className="text-blue-800 font-semibold text-right">Actions</TableHead>
-
-                </TableRow>
-
-              </TableHeader>
-
-              <TableBody>
-
-                {filteredServices.map((service) => (
-
-                  <TableRow key={service.id} className="hover:bg-blue-50/50 transition-colors duration-200">
-
-                    <TableCell>
-
-                      <div className="space-y-1">
-
-                        <div className="font-medium text-gray-900">{service.customers?.name || 'Unknown'}</div>
-
-                        {service.customers?.email && (
-
-                          <div className="text-sm text-gray-500">{service.customers.email}</div>
-
-                        )}
-
-                      </div>
-
-                    </TableCell>
-
-                    <TableCell className="font-medium text-gray-900">{service.service_name}</TableCell>
-
-                    <TableCell>
-
-                      {getServiceCategoryBadge(service.service_category)}
-
-                    </TableCell>
-
-                    <TableCell>
-
-                      {service.workers ? (
-
-                        <div className="flex items-center gap-2">
-
-                          <UserCheck className="h-4 w-4 text-indigo-500" />
-
-                          <span className="text-sm text-gray-700">{service.workers.name}</span>
-
-                        </div>
-
-                      ) : (
-
-                        <span className="text-muted-foreground">-</span>
-
-                      )}
-
-                    </TableCell>
-
-                    <TableCell>{getStatusBadge(service.status)}</TableCell>
-
-                    <TableCell>
-
-                      <div className="flex items-center gap-2">
-
-                        <Calendar className="h-4 w-4 text-blue-500" />
-
-                        <span className="text-sm text-gray-700">{formatDate(service.date_time)}</span>
-
-                      </div>
-
-                    </TableCell>
-
-                    <TableCell>
-
-                      <div className="flex items-center gap-2">
-
-                        <DollarSign className="h-4 w-4 text-emerald-500" />
-
-                        <span className="font-semibold text-emerald-700">{formatCurrency(service.service_price)}</span>
-
-                      </div>
-
-                    </TableCell>
-
-                    <TableCell className="text-right">
-
-                      <div className="flex items-center justify-end space-x-2">
-
-                        <Button
-
-                          variant="ghost"
-
-                          size="sm"
-
-                          onClick={() => openReceipt(service)}
-
-                          className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-
-                        >
-
-                          <Receipt className="h-4 w-4" />
-
-                        </Button>
-
-                        <Button
-
-                          variant="ghost"
-
-                          size="sm"
-
-                          onClick={() => openDialog(service)}
-
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-
-                        >
-
-                          <Edit className="h-4 w-4" />
-
-                        </Button>
-
-                        <Button
-
-                          variant="ghost"
-
-                          size="sm"
-
-                          onClick={() => handleDelete(service.id)}
-
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-
-                        >
-
-                          <Trash2 className="h-4 w-4" />
-
-                        </Button>
-
-                      </div>
-
-                    </TableCell>
-
-                  </TableRow>
-
-                ))}
-
-                {filteredServices.length === 0 && (
-
-                  <TableRow>
-
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-
-                      <div className="flex flex-col items-center gap-2">
-
-                        <Scissors className="h-12 w-12 text-gray-300" />
-
-                        <p>No services found</p>
-
-                        <p className="text-sm">Start by creating your first service</p>
-
-                      </div>
-
-                    </TableCell>
-
-                  </TableRow>
-
-                )}
-
-              </TableBody>
-
-            </Table>
-
-          )}
-
-        </CardContent>
-
-      </Card>
-
-
-
-      {/* Service Dialog */}
-
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto border-0 shadow-2xl">
-          <form onSubmit={handleSubmit}>
-
-            <DialogHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 p-6 -m-6 mb-6 rounded-t-lg">
-
-              <DialogTitle className="text-blue-800">
-
-                {editingService ? "Edit Service" : "Add New Service"}
-
-              </DialogTitle>
-
-              <DialogDescription className="text-blue-600">
-
-                {editingService ? "Update service information" : "Create a new service for your salon"}
-
-              </DialogDescription>
-
-            </DialogHeader>
-
-                        <div className="grid gap-6 py-4">
-              {/* Customer Selection */}
-              <div className="grid gap-2">
-                <Label className="text-gray-700 font-medium">Customer *</Label>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={isNewCustomer ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setIsNewCustomer(false)}
-                    className={!isNewCustomer ? "bg-blue-600 text-white" : ""}
-                  >
-                    Existing Customer
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={isNewCustomer ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setIsNewCustomer(true)}
-                    className={isNewCustomer ? "bg-blue-600 text-white" : ""}
-                  >
-                    New Customer
-                  </Button>
-                </div>
-              </div>
-
-              {!isNewCustomer ? (
-                <div className="grid gap-2">
-                  <Label htmlFor="customer_id" className="text-gray-700 font-medium">Select Customer *</Label>
-                  <Select
-                    value={formData.customer_id}
-                    onValueChange={(value) => setFormData({ ...formData, customer_id: value })}
-                    required
-                  >
-                    <SelectTrigger className="border-gray-200 focus:border-blue-400 focus:ring-blue-400">
-                      <SelectValue placeholder="Choose a customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {customers.map((customer) => (
-                        <SelectItem key={customer.id} value={customer.id}>
-                          {customer.name} {customer.email && `(${customer.email})`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="customer_name" className="text-gray-700 font-medium">Customer Name *</Label>
-                    <Input
-                      id="customer_name"
-                      value={formData.customer_name}
-                      onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
-                      required
-                      className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="customer_email" className="text-gray-700 font-medium">Customer Email</Label>
-                    <Input
-                      id="customer_email"
-                      type="email"
-                      value={formData.customer_email}
-                      onChange={(e) => setFormData({ ...formData, customer_email: e.target.value })}
-                      className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-                    />
-                  </div>
-                  <div className="grid gap-2 col-span-2">
-                    <Label htmlFor="customer_phone" className="text-gray-700 font-medium">Customer Phone</Label>
-                    <Input
-                      id="customer_phone"
-                      value={formData.customer_phone}
-                      onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
-                      className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-
-                <Label htmlFor="service_name" className="text-gray-700 font-medium">Service Name *</Label>
-
-                <Input
-
-                  id="service_name"
-
-                  value={formData.service_name}
-
-                  onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
-
-                  required
-
-                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-
-                />
-
-              </div>
-
-              <div className="grid gap-2">
-
-                <Label htmlFor="service_category" className="text-gray-700 font-medium">Category *</Label>
-
-                <Input
-
-                  id="service_category"
-
-                  value={formData.service_category}
-
-                  onChange={(e) => setFormData({ ...formData, service_category: e.target.value })}
-
-                  required
-
-                  placeholder="e.g., Haircut, Coloring, Styling"
-
-                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-
-                />
-
-              </div>
-
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-
-                <Label htmlFor="service_price" className="text-gray-700 font-medium">Price *</Label>
-
-                <Input
-
-                  id="service_price"
-
-                  type="number"
-
-                  step="0.01"
-
-                  value={formData.service_price}
-
-                  onChange={(e) => setFormData({ ...formData, service_price: e.target.value })}
-
-                  required
-
-                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-
-                />
-
-              </div>
-
-              <div className="grid gap-2">
-                  <Label htmlFor="staff_member_id" className="text-gray-700 font-medium">Staff Member</Label>
-                  <Select
-                    value={formData.staff_member_id}
-                    onValueChange={(value) => setFormData({ ...formData, staff_member_id: value })}
-                  >
-                    <SelectTrigger className="border-gray-200 focus:border-blue-400 focus:ring-blue-400">
-                      <SelectValue placeholder="Select staff member (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {workers.map((worker) => (
-                        <SelectItem key={worker.id} value={worker.id}>
-                          {worker.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="status" className="text-gray-700 font-medium">Status *</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) => setFormData({ ...formData, status: value })}
-                    required
-                  >
-                    <SelectTrigger className="border-gray-200 focus:border-blue-400 focus:ring-blue-400">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              <div className="grid gap-2">
-
-                <Label htmlFor="date_time" className="text-gray-700 font-medium">Date & Time *</Label>
-
-                <Input
-
-                  id="date_time"
-
-                  type="datetime-local"
-
-                  value={formData.date_time}
-
-                  onChange={(e) => setFormData({ ...formData, date_time: e.target.value })}
-
-                  required
-
-                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-
-                />
-
-              </div>
-
-              </div>
-
-              <div className="grid gap-2">
-
-                <Label htmlFor="notes" className="text-gray-700 font-medium">Notes</Label>
-
-                <Textarea
-
-                  id="notes"
-
-                  value={formData.notes}
-
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-
-                  placeholder="Additional notes about the service..."
-
-                  rows={3}
-
-                  className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-
-                />
-
-              </div>
-
-            </div>
-
-            <DialogFooter className="bg-gray-50 p-6 -m-6 mt-6 rounded-b-lg">
-
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="border-gray-300">
-
-                Cancel
-
-              </Button>
-
-              <Button 
-
-                type="submit" 
-
-                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white"
-
-              >
-
-                {editingService ? "Update" : "Create"}
-
-              </Button>
-
-            </DialogFooter>
-
-          </form>
-
-        </DialogContent>
-
-      </Dialog>
-
-
-
-      {/* Receipt Dialog */}
-
-      <ReceiptDialog
-
-        isOpen={isReceiptOpen}
-
-        onClose={() => setIsReceiptOpen(false)}
-
-        service={selectedService}
-
-      />
-
-    </div>
-
-  );
-
 }
