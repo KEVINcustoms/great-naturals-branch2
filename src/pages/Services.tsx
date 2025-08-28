@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { ReceiptDialog } from "@/components/services/ReceiptDialog";
 import { updateWorkerEarnings } from "@/utils/workerEarnings";
+import { formatCurrency } from "@/lib/utils";
 
 interface Service {
   id: string;
@@ -532,12 +533,7 @@ export default function Services() {
     return <Badge className={`${colorClass} hover:opacity-80`}>{category}</Badge>;
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'UGX',
-    }).format(amount);
-  };
+
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {

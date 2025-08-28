@@ -25,6 +25,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { formatCurrency } from "@/lib/utils";
 
 interface Worker {
   id: string;
@@ -419,7 +420,7 @@ export default function WorkerPayroll() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${calculateTotalSalary().toLocaleString()}</div>
+                            <div className="text-2xl font-bold">{formatCurrency(calculateTotalSalary())}</div>
             <p className="text-xs text-muted-foreground">
               Fixed monthly cost
             </p>
@@ -432,7 +433,7 @@ export default function WorkerPayroll() {
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${calculateTotalMonthlyEarnings().toLocaleString()}</div>
+                            <div className="text-2xl font-bold">{formatCurrency(calculateTotalMonthlyEarnings())}</div>
             <p className="text-xs text-muted-foreground">
               This month's total
             </p>
@@ -543,15 +544,15 @@ export default function WorkerPayroll() {
                       <TableCell>{getPaymentTypeBadge(worker.payment_type)}</TableCell>
                       <TableCell>
                         {worker.payment_type === 'monthly' 
-                          ? `$${worker.salary.toLocaleString()}/month`
+                          ? `${formatCurrency(worker.salary)}/month`
                           : `${worker.commission_rate}% commission`
                         }
                       </TableCell>
                       <TableCell>
-                        ${(worker.total_earnings || 0).toLocaleString()}
+                        {formatCurrency(worker.total_earnings || 0)}
                       </TableCell>
                       <TableCell>
-                        ${(worker.current_month_earnings || 0).toLocaleString()}
+                        {formatCurrency(worker.current_month_earnings || 0)}
                       </TableCell>
                       <TableCell>
                         {worker.services_performed || 0}
@@ -607,16 +608,16 @@ export default function WorkerPayroll() {
                         <Badge variant="outline">{worker.commission_rate}%</Badge>
                       </TableCell>
                       <TableCell>
-                        ${(worker.total_earnings || 0).toLocaleString()}
+                        {formatCurrency(worker.total_earnings || 0)}
                       </TableCell>
                       <TableCell>
-                        ${(worker.current_month_earnings || 0).toLocaleString()}
+                        {formatCurrency(worker.current_month_earnings || 0)}
                       </TableCell>
                       <TableCell>
                         {worker.services_performed || 0}
                       </TableCell>
                       <TableCell>
-                        ${((worker.current_month_earnings || 0) / 30).toFixed(2)}
+                        {formatCurrency((worker.current_month_earnings || 0) / 30)}
                       </TableCell>
                       <TableCell>
                         <Button
@@ -664,7 +665,7 @@ export default function WorkerPayroll() {
                       <TableCell className="font-medium">{worker.name}</TableCell>
                       <TableCell>{getRoleBadge(worker.role)}</TableCell>
                       <TableCell>
-                        ${worker.salary.toLocaleString()}/month
+                        {formatCurrency(worker.salary)}/month
                       </TableCell>
                       <TableCell>
                         {new Date(worker.hire_date).toLocaleDateString()}

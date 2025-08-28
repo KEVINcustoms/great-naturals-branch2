@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Printer, Package, Calendar, DollarSign, Hash } from "lucide-react";
 import greatNaturalsLogo from "@/assets/great-naturals-logo.jpg";
+import { formatCurrency } from "@/lib/utils";
 
 interface InventoryItem {
   id: string;
@@ -38,12 +39,7 @@ export function InventoryReceiptDialog({ isOpen, onClose, transaction }: Invento
 
   if (!transaction) return null;
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'UGX',
-    }).format(amount);
-  };
+
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {

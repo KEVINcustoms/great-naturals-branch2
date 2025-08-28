@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Printer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import greatNaturalsLogo from "@/assets/great-naturals-logo.jpg";
+import { formatCurrency } from "@/lib/utils";
 
 interface Service {
   id: string;
@@ -85,12 +86,7 @@ export function ReceiptDialog({ isOpen, onClose, service }: ReceiptDialogProps) 
     window.print();
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'UGX',
-    }).format(amount);
-  };
+
 
   if (!service) return null;
 

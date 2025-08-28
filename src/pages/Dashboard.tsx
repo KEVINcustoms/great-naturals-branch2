@@ -6,6 +6,7 @@ import { Users, UserCheck, Package, AlertTriangle, TrendingUp, Calendar, Activit
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/utils";
 
 interface DashboardStats {
   totalCustomers: number;
@@ -29,14 +30,7 @@ export default function Dashboard() {
   const { profile } = useAuth();
   const { toast } = useToast();
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-UG', {
-      style: 'currency',
-      currency: 'UGX',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
+
 
   const [stats, setStats] = useState<DashboardStats>({
     totalCustomers: 0,

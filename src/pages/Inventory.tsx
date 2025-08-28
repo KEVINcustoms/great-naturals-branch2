@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { InventoryReceiptDialog } from "@/components/inventory/InventoryReceiptDialog";
+import { formatCurrency } from "@/lib/utils";
 
 interface InventoryItem {
   id: string;
@@ -401,12 +402,7 @@ export default function Inventory() {
     return <Badge className={`${colorClass} hover:opacity-80`}>{categoryName}</Badge>;
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'UGX',
-    }).format(amount);
-  };
+
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {

@@ -17,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResponsiveContainer, AreaChart, Area, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell } from 'recharts';
+import { formatCurrency } from '@/lib/utils';
 
 interface FinancialMetrics {
   totalRevenue: number;
@@ -313,7 +314,7 @@ export default function FinancialAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              ${financialMetrics?.totalRevenue.toLocaleString() || 0}
+                              {formatCurrency(financialMetrics?.totalRevenue || 0)}
             </div>
             <p className="text-xs text-muted-foreground">
               {financialMetrics?.monthlyGrowth ? (
@@ -332,7 +333,7 @@ export default function FinancialAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              ${financialMetrics?.totalExpenses.toLocaleString() || 0}
+                              {formatCurrency(financialMetrics?.totalExpenses || 0)}
             </div>
             <p className="text-xs text-muted-foreground">
               {expenseCategories.length > 0 ? `${expenseCategories.length} categories` : 'No expense data'}
@@ -347,7 +348,7 @@ export default function FinancialAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              ${financialMetrics?.netProfit.toLocaleString() || 0}
+                              {formatCurrency(financialMetrics?.netProfit || 0)}
             </div>
             <p className="text-xs text-muted-foreground">
               {financialMetrics?.profitMargin ? `${financialMetrics.profitMargin.toFixed(1)}% margin` : 'No margin data'}
@@ -428,7 +429,7 @@ export default function FinancialAnalytics() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
-                  <Tooltip formatter={(value, name) => [`$${value}`, name]}/>
+                  <Tooltip formatter={(value, name) => [typeof value === 'number' ? formatCurrency(value) : value, name]}/>
                   <Area 
                     type="monotone" 
                     dataKey="revenue" 
@@ -466,7 +467,7 @@ export default function FinancialAnalytics() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
-                  <Tooltip formatter={(value) => [`$${value}`, 'Profit']}/>
+                  <Tooltip formatter={(value) => [typeof value === 'number' ? formatCurrency(value) : value, 'Profit']}/>
                   <Line 
                     type="monotone" 
                     dataKey="profit" 
@@ -572,7 +573,7 @@ export default function FinancialAnalytics() {
                         <Cell key={`cell-${index}`} fill={`hsl(${index * 60}, 70%, 60%)`} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value) => [`$${value}`, 'Amount']}/>
+                    <Tooltip formatter={(value) => [typeof value === 'number' ? formatCurrency(value) : value, 'Amount']}/>
                   </PieChart>
                 </ResponsiveContainer>
                 
@@ -593,7 +594,7 @@ export default function FinancialAnalytics() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold">${category.amount.toLocaleString()}</span>
+                        <span className="font-bold">{formatCurrency(category.amount)}</span>
                         {getTrendIcon(category.trend)}
                       </div>
                     </div>
@@ -620,7 +621,7 @@ export default function FinancialAnalytics() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="product_name" />
                   <YAxis />
-                  <Tooltip formatter={(value, name) => [name === 'revenue_generated' ? `$${value}` : value, name === 'revenue_generated' ? 'Revenue' : 'Quantity']}/>
+                  <Tooltip formatter={(value, name) => [name === 'revenue_generated' ? (typeof value === 'number' ? formatCurrency(value) : value) : value, name === 'revenue_generated' ? 'Revenue' : 'Quantity']}/>
                   <Bar dataKey="revenue_generated" fill="#3b82f6" name="Revenue" />
                   <Bar dataKey="quantity_sold" fill="#10b981" name="Quantity" />
                 </BarChart>
@@ -661,7 +662,7 @@ export default function FinancialAnalytics() {
                         </td>
                         <td className="p-2">{product.quantity_sold}</td>
                         <td className="p-2 text-green-600 font-medium">
-                          ${product.revenue_generated.toLocaleString()}
+                          {formatCurrency(product.revenue_generated)}
                         </td>
                         <td className="p-2">
                           <Badge variant="outline" className="bg-green-100 text-green-800">
@@ -723,7 +724,7 @@ export default function FinancialAnalytics() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold">${category.amount.toLocaleString()}</span>
+                  <span className="font-bold">{formatCurrency(category.amount)}</span>
                   {getTrendIcon(category.trend)}
                 </div>
               </div>
@@ -759,7 +760,7 @@ export default function FinancialAnalytics() {
                     <td className="p-2 font-medium">{product.product_name}</td>
                     <td className="p-2">{product.quantity_sold}</td>
                     <td className="p-2 text-green-600 font-medium">
-                      ${product.revenue_generated.toLocaleString()}
+                      {formatCurrency(product.revenue_generated)}
                     </td>
                     <td className="p-2">
                       <Badge variant="outline" className="bg-green-100 text-green-800">
