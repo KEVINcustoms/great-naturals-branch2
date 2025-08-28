@@ -422,7 +422,7 @@ export default function AdminManagement() {
           <div className="mt-2 inline-flex items-center gap-2 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-full px-3 py-1">
             <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
             <span className="text-xs font-medium text-purple-700">
-              Enhanced features coming in future updates from Devzora Tecnologies
+              Enhanced features coming in future updates from KEVINcustom
             </span>
           </div>
         </div>
@@ -812,7 +812,7 @@ export default function AdminManagement() {
                 <div className="flex-1">
                   <p className="text-xs font-medium text-amber-800 mb-1">Coming Soon - Enhanced Access Control</p>
                   <p className="text-xs text-amber-700 leading-relaxed">
-                    Future updates from <strong>Devzora Technologies</strong> will include advanced user management features, 
+                    Future updates from <strong>Our Team</strong> will include advanced user management features, 
                     detailed access logs, temporary restrictions, and automated compliance monitoring.
                   </p>
                 </div>

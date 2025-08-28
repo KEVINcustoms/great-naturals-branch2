@@ -237,7 +237,7 @@ export default function Workers() {
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-blue-900 mb-1">System Updates & Maintenance</h3>
             <p className="text-sm text-blue-700 leading-relaxed">
-              This system is actively maintained and enhanced by <strong>Devzora Technologies</strong>. 
+              This system is actively maintained and enhanced by <strong>Our Team</strong>. 
               Future updates will include new features, security improvements, and performance optimizations. 
               For technical support or feature requests, please contact our development team.
             </p>

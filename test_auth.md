@@ -67,3 +67,4 @@ WHERE trigger_name = 'on_auth_user_created';
 
 
 
+
