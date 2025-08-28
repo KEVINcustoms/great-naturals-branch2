@@ -507,7 +507,7 @@ export default function Workers() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="monthly">Monthly Salary</SelectItem>
-                    <SelectItem value="commission">Commission Based (6%)</SelectItem>
+                    <SelectItem value="commission">Commission Based (%)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
