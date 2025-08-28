@@ -7,11 +7,16 @@ import {
   AlertTriangle, 
   Lightbulb, 
   RefreshCw,
-  Download
+  Download,
+  Plus,
+  Save
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -100,6 +105,28 @@ interface KPI {
   change_percentage: number;
 }
 
+interface ExpenseField {
+  name: string;
+  category: string;
+  amount: string;
+}
+
+interface ExpenseRecord {
+  id: string;
+  name: string;
+  category: string;
+  amount: number;
+  date: string;
+  created_by: string;
+  created_at: string;
+}
+
+interface MonthlyExpensesData {
+  month: string;
+  totalExpenses: number;
+  expenseCount: number;
+}
+
 export default function FinancialAnalytics() {
   const [selectedPeriod, setSelectedPeriod] = useState('current_month');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
@@ -109,12 +136,20 @@ export default function FinancialAnalytics() {
   const [topProducts, setTopProducts] = useState<ProductPerformance[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [businessInsights, setBusinessInsights] = useState<BusinessInsight[]>([]);
+  const [expenseFields, setExpenseFields] = useState<ExpenseField[]>([
+    { name: '', category: '', amount: '' }
+  ]);
+  const [recentExpenses, setRecentExpenses] = useState<ExpenseRecord[]>([]);
+  const [isSubmittingExpenses, setIsSubmittingExpenses] = useState(false);
+  const [monthlyExpensesData, setMonthlyExpensesData] = useState<MonthlyExpensesData[]>([]);
   
   const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
     fetchFinancialData();
+    fetchRecentExpenses();
+    fetchMonthlyExpenses();
   }, [selectedPeriod, selectedYear]);
 
   const fetchFinancialData = async () => {
@@ -275,6 +310,202 @@ export default function FinancialAnalytics() {
     }
   };
 
+  // Expense Management Functions
+  const addExpenseField = () => {
+    setExpenseFields([...expenseFields, { name: '', category: '', amount: '' }]);
+  };
+
+  const removeExpenseField = (index: number) => {
+    if (expenseFields.length > 1) {
+      const newFields = expenseFields.filter((_, i) => i !== index);
+      setExpenseFields(newFields);
+    }
+  };
+
+  const handleExpenseFieldChange = (index: number, field: keyof ExpenseField, value: string) => {
+    const newFields = [...expenseFields];
+    newFields[index] = { ...newFields[index], [field]: value };
+    setExpenseFields(newFields);
+  };
+
+  const handleExpenseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setIsSubmittingExpenses(true);
+    try {
+      // Check if expenses table exists
+      const { error: tableCheckError } = await supabase
+        .from('expenses' as never)
+        .select('id')
+        .limit(1);
+      
+      if (tableCheckError) {
+        if (tableCheckError.message.includes('relation "expenses" does not exist')) {
+          toast({
+            title: "Database Setup Required",
+            description: "Please run the expenses table migration in Supabase first.",
+            variant: "destructive",
+          });
+          return;
+        }
+        throw tableCheckError;
+      }
+      // Validate fields
+      const validExpenses = expenseFields.filter(field => 
+        field.name.trim() && field.category && parseFloat(field.amount) > 0
+      );
+
+      if (validExpenses.length === 0) {
+        toast({
+          title: "No valid expenses",
+          description: "Please fill in at least one expense field completely.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Prepare expenses for database
+      const expensesToInsert = validExpenses.map(field => ({
+        name: field.name.trim(),
+        category: field.category,
+        amount: parseFloat(field.amount),
+        date: new Date().toISOString().split('T')[0],
+        created_by: user.id,
+        created_at: new Date().toISOString()
+      }));
+
+      // Insert expenses into Supabase
+      const { data, error } = await supabase
+        .from('expenses' as never)
+        .insert(expensesToInsert)
+        .select();
+
+      if (error) throw error;
+
+      toast({
+        title: "Expenses saved successfully",
+        description: `${validExpenses.length} expense(s) have been recorded.`,
+      });
+
+      // Reset form
+      setExpenseFields([{ name: '', category: '', amount: '' }]);
+      
+      // Refresh recent expenses
+      fetchRecentExpenses();
+      
+      // Refresh monthly expenses
+      fetchMonthlyExpenses();
+      
+      // Refresh financial data
+      fetchFinancialData();
+
+    } catch (error) {
+      console.error("Error saving expenses:", error);
+      
+      // Provide more specific error information
+      let errorMessage = "Failed to save expenses. Please try again.";
+      
+      if (error instanceof Error) {
+        if (error.message.includes('relation "expenses" does not exist')) {
+          errorMessage = "Expenses table not found. Please run the database migration first.";
+        } else if (error.message.includes('permission denied')) {
+          errorMessage = "Permission denied. Please check your authentication.";
+        } else if (error.message.includes('invalid input syntax')) {
+          errorMessage = "Invalid data format. Please check your input.";
+        } else {
+          errorMessage = `Error: ${error.message}`;
+        }
+      }
+      
+      toast({
+        title: "Error saving expenses",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingExpenses(false);
+    }
+  };
+
+  const fetchRecentExpenses = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('expenses' as never)
+        .select('*')
+        .eq('created_by', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      setRecentExpenses((data as ExpenseRecord[]) || []);
+    } catch (error) {
+      console.error("Error fetching recent expenses:", error);
+    }
+  };
+
+  const fetchMonthlyExpenses = async () => {
+    if (!user) return;
+    
+    try {
+      // Get expenses for the last 12 months
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 11);
+      twelveMonthsAgo.setDate(1); // Start of month
+      
+      const { data, error } = await supabase
+        .from('expenses' as never)
+        .select('*')
+        .eq('created_by', user.id)
+        .gte('date', twelveMonthsAgo.toISOString().split('T')[0])
+        .order('date', { ascending: true });
+
+      if (error) throw error;
+
+      // Group expenses by month
+      const monthlyData: { [key: string]: MonthlyExpensesData } = {};
+      
+      // Initialize last 12 months
+      for (let i = 11; i >= 0; i--) {
+        const date = new Date();
+        date.setMonth(date.getMonth() - i);
+        const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        monthlyData[monthKey] = {
+          month: monthKey,
+          totalExpenses: 0,
+          expenseCount: 0
+        };
+      }
+
+      // Aggregate expenses by month
+      if (data) {
+        data.forEach((expense: ExpenseRecord) => {
+          const expenseDate = new Date(expense.date);
+          const monthKey = expenseDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+          
+          if (monthlyData[monthKey]) {
+            monthlyData[monthKey].totalExpenses += expense.amount;
+            monthlyData[monthKey].expenseCount += 1;
+          }
+        });
+      }
+
+      // Convert to array and sort by month
+      const monthlyArray = Object.values(monthlyData).sort((a, b) => {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const aMonth = months.indexOf(a.month.split(' ')[0]);
+        const bMonth = months.indexOf(b.month.split(' ')[0]);
+        return aMonth - bMonth;
+      });
+
+      setMonthlyExpensesData(monthlyArray);
+    } catch (error) {
+      console.error("Error fetching monthly expenses:", error);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -285,6 +516,37 @@ export default function FinancialAnalytics() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      {/* Development Notice */}
+      <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-lg p-6 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-amber-100 rounded-full">
+            <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="text-lg font-bold text-amber-900">🚧 UNDER DEVELOPMENT</h3>
+              <span className="px-3 py-1 bg-amber-200 text-amber-800 text-xs font-bold rounded-full border border-amber-300">
+                FUTURE UPDATE
+              </span>
+            </div>
+            <p className="text-amber-800 leading-relaxed">
+              <strong>Financial Analytics Dashboard</strong> is currently in active development. 
+              This page displays mock data for demonstration purposes. 
+              Real-time financial tracking, expense management, and business intelligence features 
+              will be available in upcoming updates.
+            </p>
+                         <div className="mt-3 text-sm text-amber-700 space-y-1">
+               <p>• <strong>Current Status:</strong> Development Phase - Mock Data Display</p>
+               <p>• <strong>Next Release:</strong> Real-time database integration</p>
+               <p>• <strong>Coming Soon:</strong> Automated reports and advanced analytics</p>
+               <p>• <strong>✅ Available Now:</strong> Live expense tracking and recording</p>
+             </div>
+          </div>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -406,10 +668,11 @@ export default function FinancialAnalytics() {
 
       {/* Professional Charts Section */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="trends">Trends</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
+          <TabsTrigger value="add-expenses">Add Expenses</TabsTrigger>
           <TabsTrigger value="products">Products</TabsTrigger>
         </TabsList>
 
@@ -601,6 +864,270 @@ export default function FinancialAnalytics() {
                   ))}
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Monthly Expenses Overview */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Monthly Expenses Overview</CardTitle>
+              <CardDescription>
+                Track your total expenses for each month to monitor spending patterns
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Monthly Expenses Chart */}
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={monthlyExpensesData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip 
+                        formatter={(value) => [typeof value === 'number' ? formatCurrency(value) : value, 'Total Expenses']}
+                        labelStyle={{ color: '#374151' }}
+                      />
+                      <Bar 
+                        dataKey="totalExpenses" 
+                        fill="#ef4444" 
+                        name="Total Expenses"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Monthly Expenses Table */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Monthly Breakdown</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b bg-gray-50">
+                          <th className="text-left p-3 font-medium">Month</th>
+                          <th className="text-left p-3 font-medium">Total Expenses</th>
+                          <th className="text-left p-3 font-medium">Expense Count</th>
+                          <th className="text-left p-3 font-medium">Avg per Expense</th>
+                          <th className="text-left p-3 font-medium">Trend</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {monthlyExpensesData.map((monthData, index) => (
+                          <tr key={monthData.month} className="border-b hover:bg-gray-50">
+                            <td className="p-3 font-medium">{monthData.month}</td>
+                            <td className="p-3 text-red-600 font-bold">
+                              {formatCurrency(monthData.totalExpenses)}
+                            </td>
+                            <td className="p-3">{monthData.expenseCount}</td>
+                            <td className="p-3 text-gray-600">
+                              {monthData.expenseCount > 0 
+                                ? formatCurrency(monthData.totalExpenses / monthData.expenseCount)
+                                : 'N/A'
+                              }
+                            </td>
+                            <td className="p-3">
+                              {index > 0 && (
+                                <div className="flex items-center gap-2">
+                                  {monthData.totalExpenses > monthlyExpensesData[index - 1].totalExpenses ? (
+                                    <TrendingUp className="h-4 w-4 text-red-600" />
+                                  ) : monthData.totalExpenses < monthlyExpensesData[index - 1].totalExpenses ? (
+                                    <TrendingDown className="h-4 w-4 text-green-600" />
+                                  ) : (
+                                    <DollarSign className="h-4 w-4 text-gray-600" />
+                                  )}
+                                  <span className={`text-sm ${
+                                    monthData.totalExpenses > monthlyExpensesData[index - 1].totalExpenses 
+                                      ? 'text-red-600' 
+                                      : monthData.totalExpenses < monthlyExpensesData[index - 1].totalExpenses 
+                                        ? 'text-green-600' 
+                                        : 'text-gray-600'
+                                  }`}>
+                                    {index > 0 ? (
+                                      monthData.totalExpenses > monthlyExpensesData[index - 1].totalExpenses 
+                                        ? `+${formatCurrency(monthData.totalExpenses - monthlyExpensesData[index - 1].totalExpenses)}`
+                                        : monthData.totalExpenses < monthlyExpensesData[index - 1].totalExpenses 
+                                          ? `-${formatCurrency(monthlyExpensesData[index - 1].totalExpenses - monthData.totalExpenses)}`
+                                          : 'No change'
+                                    ) : 'N/A'
+                                    }
+                                  </span>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Add Expenses Tab */}
+        <TabsContent value="add-expenses" className="space-y-6">
+          {/* Setup Notice */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-full">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h4 className="font-semibold text-blue-900"> </h4>
+                <p className="text-sm text-blue-700">
+                    
+                    <code className="bg-blue-100 px-2 py-1 rounded text-xs"> </code>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Add New Expenses</CardTitle>
+              <CardDescription>
+                Record your business expenses for better financial tracking and analysis
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleExpenseSubmit} className="space-y-6">
+                {/* Expense Fields */}
+                <div className="space-y-4">
+                  {expenseFields.map((field, index) => (
+                    <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded-lg bg-gray-50">
+                      <div>
+                        <Label htmlFor={`expense-name-${index}`}>Expense Name *</Label>
+                        <Input
+                          id={`expense-name-${index}`}
+                          value={field.name}
+                          onChange={(e) => handleExpenseFieldChange(index, 'name', e.target.value)}
+                          placeholder="e.g., Office Supplies, Utilities"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`expense-category-${index}`}>Category *</Label>
+                        <Select 
+                          value={field.category} 
+                          onValueChange={(value) => handleExpenseFieldChange(index, 'category', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="inventory">Inventory</SelectItem>
+                            <SelectItem value="utilities">Utilities</SelectItem>
+                            <SelectItem value="staff_salaries">Staff Salaries</SelectItem>
+                            <SelectItem value="marketing">Marketing</SelectItem>
+                            <SelectItem value="maintenance">Maintenance</SelectItem>
+                            <SelectItem value="rent">Rent</SelectItem>
+                            <SelectItem value="insurance">Insurance</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor={`expense-amount-${index}`}>Amount (TZS) *</Label>
+                        <Input
+                          id={`expense-amount-${index}`}
+                          type="number"
+                          value={field.amount}
+                          onChange={(e) => handleExpenseFieldChange(index, 'amount', e.target.value)}
+                          placeholder="0"
+                          min="0"
+                          step="0.01"
+                          required
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeExpenseField(index)}
+                          className="w-full bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add More Fields Button */}
+                <div className="flex justify-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addExpenseField}
+                    className="border-dashed border-2 border-gray-300 hover:border-gray-400"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Another Expense
+                  </Button>
+                </div>
+
+                {/* Submit Button */}
+                <div className="flex justify-end">
+                  <Button 
+                    type="submit" 
+                    disabled={isSubmittingExpenses}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {isSubmittingExpenses ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Saving Expenses...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Save All Expenses
+                      </>
+                      )}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Recent Expenses */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Expenses</CardTitle>
+              <CardDescription>
+                View your recently added expenses
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {recentExpenses.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <BarChart3 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p>No expenses recorded yet. Start adding expenses above.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {recentExpenses.map((expense, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                        <div>
+                          <p className="font-medium">{expense.name}</p>
+                          <p className="text-sm text-gray-500 capitalize">{expense.category.replace('_', ' ')}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-red-600">{formatCurrency(expense.amount)}</p>
+                        <p className="text-xs text-gray-500">{new Date(expense.date).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

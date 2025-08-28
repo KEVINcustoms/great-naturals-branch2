@@ -671,7 +671,7 @@ export default function WorkerPayroll() {
                         {new Date(worker.hire_date).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
-                        ${(worker.salary * 12).toLocaleString()}/year
+                        {formatCurrency(worker.salary * 12)}/year
                       </TableCell>
                       <TableCell>
                         <Button
@@ -729,7 +729,7 @@ export default function WorkerPayroll() {
                       </p>
                       <p className="font-medium">
                         {selectedWorker.payment_type === 'monthly' 
-                          ? `$${selectedWorker.salary.toLocaleString()}`
+                          ? formatCurrency(selectedWorker.salary)
                           : `${selectedWorker.commission_rate}%`
                         }
                       </p>
@@ -765,7 +765,7 @@ export default function WorkerPayroll() {
                       <div className="text-sm text-muted-foreground">
                         {workerDailyEarnings.find(d => d.date === selectedWorkerDate) ? (
                           <span className="text-green-600 font-medium">
-                            ${workerDailyEarnings.find(d => d.date === selectedWorkerDate)?.earnings.toFixed(2)} earned on this date
+                            {formatCurrency(workerDailyEarnings.find(d => d.date === selectedWorkerDate)?.earnings || 0)} earned on this date
                           </span>
                         ) : (
                           <span className="text-gray-500">No services on this date</span>
@@ -812,7 +812,7 @@ export default function WorkerPayroll() {
                             </div>
                             <div className="text-right">
                               <p className="text-lg font-bold text-green-600">
-                                ${daily.earnings.toFixed(2)}
+                                {formatCurrency(daily.earnings)}
                               </p>
                               <p className="text-sm text-muted-foreground">
                                 Commission earned
@@ -854,10 +854,10 @@ export default function WorkerPayroll() {
                           </TableCell>
                           <TableCell className="font-medium">{service.service_name}</TableCell>
                           <TableCell>{service.customer_name}</TableCell>
-                          <TableCell>${service.service_price.toLocaleString()}</TableCell>
+                          <TableCell>{formatCurrency(service.service_price)}</TableCell>
                           <TableCell>
                             <span className="text-green-600 font-medium">
-                              ${service.commission_amount.toFixed(2)}
+                              {formatCurrency(service.commission_amount)}
                             </span>
                           </TableCell>
                           <TableCell>
