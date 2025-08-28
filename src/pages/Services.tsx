@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Edit, Trash2, Receipt, Calendar, Users, Scissors, DollarSign, Clock, UserCheck } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Receipt, Calendar, Users, Scissors, DollarSign, Clock, UserCheck, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,7 @@ interface Service {
   notes: string | null;
   created_by: string;
   created_at: string;
+  commission_rate?: number | null;
   customers?: { name: string; email: string; phone: string } | null;
   workers?: { name: string } | null;
 }
@@ -90,6 +91,7 @@ export default function Services() {
     status: "pending",
     date_time: new Date().toISOString().slice(0, 16),
     notes: "",
+    commission_rate: "",
   });
 
   const [serviceProducts, setServiceProducts] = useState<ServiceProduct[]>([]);
@@ -251,6 +253,7 @@ export default function Services() {
         status: formData.status,
         date_time: formData.date_time,
         notes: formData.notes || null,
+        commission_rate: formData.commission_rate ? parseFloat(formData.commission_rate) : null,
         created_by: user.id,
       };
 
@@ -359,6 +362,7 @@ export default function Services() {
         status: "pending",
         date_time: new Date().toISOString().slice(0, 16),
         notes: "",
+        commission_rate: "",
       });
       setServiceProducts([]);
       fetchData();
@@ -407,6 +411,7 @@ export default function Services() {
       status: "pending",
       date_time: new Date().toISOString().slice(0, 16),
       notes: "",
+      commission_rate: "",
     });
     setServiceProducts([]);
     setIsNewCustomer(false);
@@ -427,6 +432,7 @@ export default function Services() {
         status: service.status,
         date_time: new Date(service.date_time).toISOString().slice(0, 16),
         notes: service.notes || "",
+        commission_rate: service.commission_rate?.toString() || "",
       });
       
       // Fetch existing service products
@@ -467,6 +473,7 @@ export default function Services() {
         status: "pending",
         date_time: new Date().toISOString().slice(0, 16),
         notes: "",
+        commission_rate: "",
       });
       setServiceProducts([]);
     }
@@ -594,8 +601,9 @@ export default function Services() {
                   <TableHead className="text-blue-800 font-semibold">Staff</TableHead>
                   <TableHead className="text-blue-800 font-semibold">Status</TableHead>
                   <TableHead className="text-blue-800 font-semibold">Date & Time</TableHead>
-                  <TableHead className="text-blue-800 font-semibold">Price</TableHead>
-                  <TableHead className="text-blue-800 font-semibold text-right">Actions</TableHead>
+                                      <TableHead className="text-blue-800 font-semibold">Price</TableHead>
+                    <TableHead className="text-blue-800 font-semibold">Commission Rate</TableHead>
+                    <TableHead className="text-blue-800 font-semibold text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -636,6 +644,14 @@ export default function Services() {
                         <span className="font-semibold text-emerald-700">{formatCurrency(service.service_price)}</span>
                       </div>
                     </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-purple-500" />
+                        <span className="text-sm text-gray-700">
+                          {service.commission_rate ? `${service.commission_rate}%` : 'Worker Default'}
+                        </span>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end space-x-2">
                         <Button
@@ -668,7 +684,7 @@ export default function Services() {
                 ))}
                 {filteredServices.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       <div className="flex flex-col items-center gap-2">
                         <Scissors className="h-12 w-12 text-gray-300" />
                         <p>No services found</p>
@@ -872,6 +888,26 @@ export default function Services() {
                   className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
                 />
               </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="commission_rate" className="text-gray-700 font-medium">Commission Rate (%)</Label>
+                  <Input
+                    id="commission_rate"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    value={formData.commission_rate}
+                    onChange={(e) => setFormData({ ...formData, commission_rate: e.target.value })}
+                    placeholder="Leave empty for worker default"
+                    className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Custom commission rate for this service. If empty, uses worker's default rate.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="staff_member_id" className="text-gray-700 font-medium">Staff Member</Label>
                   <Select

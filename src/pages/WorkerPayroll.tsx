@@ -48,6 +48,8 @@ interface ServiceHistory {
   commission_amount: number;
   service_date: string;
   status: string;
+  service_commission_rate?: number;
+  worker_commission_rate?: number;
 }
 
 interface DailyEarnings {
@@ -70,6 +72,12 @@ export default function WorkerPayroll() {
   const [workerServiceHistory, setWorkerServiceHistory] = useState<ServiceHistory[]>([]);
   const [workerDailyEarnings, setWorkerDailyEarnings] = useState<DailyEarnings[]>([]);
   const [selectedWorkerDate, setSelectedWorkerDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [isCommissionEditOpen, setIsCommissionEditOpen] = useState(false);
+  const [editingCommissionWorker, setEditingCommissionWorker] = useState<Worker | null>(null);
+  const [newCommissionRate, setNewCommissionRate] = useState<string>("");
+  const [isServiceCommissionEditOpen, setIsServiceCommissionEditOpen] = useState(false);
+  const [editingServiceCommission, setEditingServiceCommission] = useState<{serviceId: string, serviceName: string, currentRate: number} | null>(null);
+  const [newServiceCommissionRate, setNewServiceCommissionRate] = useState<string>("");
   
   const { user } = useAuth();
   const { toast } = useToast();
@@ -105,8 +113,16 @@ export default function WorkerPayroll() {
               current_month_earnings: earnings.currentMonthEarnings,
               services_performed: earnings.servicesPerformed
             };
+          } else {
+            // For salary workers, still count services for tracking purposes
+            const serviceCount = await getWorkerServiceCount(worker.id);
+            return {
+              ...worker,
+              total_earnings: worker.salary || 0,
+              current_month_earnings: worker.salary || 0,
+              services_performed: serviceCount
+            };
           }
-          return worker;
         })
       );
       
@@ -120,6 +136,22 @@ export default function WorkerPayroll() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const getWorkerServiceCount = async (workerId: string) => {
+    try {
+      const { data: services, error } = await supabase
+        .from("services")
+        .select("id")
+        .eq("staff_member_id", workerId)
+        .eq("status", "completed");
+
+      if (error) throw error;
+      return services?.length || 0;
+    } catch (error) {
+      console.error("Error getting worker service count:", error);
+      return 0;
     }
   };
 
@@ -152,10 +184,22 @@ export default function WorkerPayroll() {
         .eq("id", workerId)
         .single();
 
-      const commissionRate = worker?.commission_rate || 6;
+      const workerCommissionRate = worker?.commission_rate || 0;
+      
+      // Get commission rates for all services
+      const serviceIds = services.map(s => s.id);
+      const { data: serviceCommissionRates } = await supabase
+        .from("services")
+        .select("id, commission_rate")
+        .in("id", serviceIds);
+      
+      const serviceCommissionMap = new Map(
+        serviceCommissionRates?.map(s => [s.id, s.commission_rate]) || []
+      );
       
       const totalEarnings = services.reduce((sum, service) => {
-        const commission = (service.service_price * commissionRate) / 100;
+        const serviceCommissionRate = serviceCommissionMap.get(service.id) || workerCommissionRate;
+        const commission = (service.service_price * serviceCommissionRate) / 100;
         return sum + commission;
       }, 0);
 
@@ -165,7 +209,8 @@ export default function WorkerPayroll() {
       const currentMonthEarnings = services.reduce((sum, service) => {
         const serviceDate = new Date(service.created_at);
         if (serviceDate.getMonth() === currentMonth && serviceDate.getFullYear() === currentYear) {
-          const commission = (service.service_price * commissionRate) / 100;
+          const serviceCommissionRate = serviceCommissionMap.get(service.id) || workerCommissionRate;
+          const commission = (service.service_price * serviceCommissionRate) / 100;
           return sum + commission;
         }
         return sum;
@@ -213,18 +258,34 @@ export default function WorkerPayroll() {
         .eq("id", workerId)
         .single();
 
-      const commissionRate = worker?.commission_rate || 6;
+      const workerCommissionRate = worker?.commission_rate || 0;
+
+      // Get commission rates for all services
+      const serviceIds = services.map(s => s.id);
+      const { data: serviceCommissionRates } = await supabase
+        .from("services")
+        .select("id, commission_rate")
+        .in("id", serviceIds);
+      
+      const serviceCommissionMap = new Map(
+        serviceCommissionRates?.map(s => [s.id, s.commission_rate]) || []
+      );
 
       // Transform services to include commission calculations
-      const servicesWithCommission = services.map(service => ({
-        id: service.id,
-        service_name: service.service_name,
-        service_price: service.service_price,
-        customer_name: service.customers?.name || 'Unknown Customer',
-        commission_amount: (service.service_price * commissionRate) / 100,
-        service_date: service.created_at,
-        status: service.status
-      }));
+      const servicesWithCommission = services.map(service => {
+        const serviceCommissionRate = serviceCommissionMap.get(service.id) || workerCommissionRate;
+        return {
+          id: service.id,
+          service_name: service.service_name,
+          service_price: service.service_price,
+          customer_name: service.customers?.name || 'Unknown Customer',
+          commission_amount: (service.service_price * serviceCommissionRate) / 100,
+          service_date: service.created_at,
+          status: service.status,
+          service_commission_rate: serviceCommissionRate,
+          worker_commission_rate: workerCommissionRate
+        };
+      });
 
       setWorkerServiceHistory(servicesWithCommission);
 
@@ -267,6 +328,103 @@ export default function WorkerPayroll() {
     setSelectedWorker(worker);
     setSelectedWorkerDate(new Date().toISOString().slice(0, 10));
     setIsWorkerDetailOpen(true);
+  };
+
+  const openCommissionEdit = (worker: Worker) => {
+    setEditingCommissionWorker(worker);
+    setNewCommissionRate(worker.commission_rate.toString());
+    setIsCommissionEditOpen(true);
+  };
+
+  const updateCommissionRate = async () => {
+    if (!editingCommissionWorker || !newCommissionRate) return;
+    
+    try {
+      const { error } = await supabase
+        .from("workers")
+        .update({ commission_rate: parseFloat(newCommissionRate) })
+        .eq("id", editingCommissionWorker.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setWorkers(prev => prev.map(worker => 
+        worker.id === editingCommissionWorker.id 
+          ? { ...worker, commission_rate: parseFloat(newCommissionRate) }
+          : worker
+      ));
+
+      // Refresh earnings for this worker
+      if (editingCommissionWorker.payment_type === 'commission') {
+        const earnings = await calculateWorkerEarnings(editingCommissionWorker.id);
+        setWorkers(prev => prev.map(worker => 
+          worker.id === editingCommissionWorker.id 
+            ? { ...worker, total_earnings: earnings.totalEarnings, current_month_earnings: earnings.currentMonthEarnings }
+            : worker
+        ));
+      }
+
+      toast({
+        title: "Success",
+        description: `Commission rate updated to ${newCommissionRate}%`,
+      });
+
+      setIsCommissionEditOpen(false);
+      setEditingCommissionWorker(null);
+      setNewCommissionRate("");
+    } catch (error) {
+      console.error("Error updating commission rate:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update commission rate",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const openServiceCommissionEdit = (service: ServiceHistory) => {
+    setEditingServiceCommission({
+      serviceId: service.id,
+      serviceName: service.service_name,
+      currentRate: service.service_commission_rate || 0
+    });
+    setNewServiceCommissionRate(service.service_commission_rate?.toString() || "0");
+    setIsServiceCommissionEditOpen(true);
+  };
+
+  const updateServiceCommissionRate = async () => {
+    if (!editingServiceCommission || !newServiceCommissionRate) return;
+    
+    try {
+      const { error } = await supabase
+        .from("services")
+        .update({ commission_rate: parseFloat(newServiceCommissionRate) })
+        .eq("id", editingServiceCommission.serviceId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Service commission rate updated to ${newServiceCommissionRate}%`,
+      });
+
+      // Refresh worker data to reflect new commission rates
+      await fetchWorkers();
+      if (selectedWorker) {
+        await fetchWorkerServiceHistory(selectedWorker.id);
+      }
+
+      setIsServiceCommissionEditOpen(false);
+      setEditingServiceCommission(null);
+      setNewServiceCommissionRate("");
+    } catch (error) {
+      console.error("Error updating service commission rate:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update service commission rate",
+        variant: "destructive",
+      });
+    }
   };
 
   const getPaymentTypeBadge = (paymentType: string) => {
@@ -516,11 +674,22 @@ export default function WorkerPayroll() {
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle>All Workers - Earnings Summary</CardTitle>
-              <CardDescription>
-                Complete overview of all workers and their current earnings status (Real-time data)
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>All Workers - Earnings Summary</CardTitle>
+                <CardDescription>
+                  Complete overview of all workers and their current earnings status (Real-time data)
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchWorkers}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh
+              </Button>
             </CardHeader>
             <CardContent>
               <Table>
@@ -529,6 +698,7 @@ export default function WorkerPayroll() {
                     <TableHead>Worker</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Payment Type</TableHead>
+                    <TableHead>Commission Rate</TableHead>
                     <TableHead>Base Amount</TableHead>
                     <TableHead>Total Earnings</TableHead>
                     <TableHead>This Month</TableHead>
@@ -544,8 +714,28 @@ export default function WorkerPayroll() {
                       <TableCell>{getPaymentTypeBadge(worker.payment_type)}</TableCell>
                       <TableCell>
                         {worker.payment_type === 'monthly' 
+                          ? 'N/A'
+                          : (
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">{worker.commission_rate}%</Badge>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openCommissionEdit(worker)}
+                                className="h-6 w-6 p-0"
+                              >
+                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </Button>
+                            </div>
+                          )
+                        }
+                      </TableCell>
+                      <TableCell>
+                        {worker.payment_type === 'monthly' 
                           ? `${formatCurrency(worker.salary)}/month`
-                          : `${worker.commission_rate}% commission`
+                          : 'Commission based'
                         }
                       </TableCell>
                       <TableCell>
@@ -579,11 +769,22 @@ export default function WorkerPayroll() {
         {/* Commission Workers Tab */}
         <TabsContent value="commission" className="space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Commission-Based Workers</CardTitle>
-              <CardDescription>
-                Detailed breakdown of commission workers and their daily/monthly earnings (Real-time data)
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Commission-Based Workers</CardTitle>
+                <CardDescription>
+                  Detailed breakdown of commission workers and their daily/monthly earnings (Real-time data)
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchWorkers}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh
+              </Button>
             </CardHeader>
             <CardContent>
               <Table>
@@ -605,7 +806,19 @@ export default function WorkerPayroll() {
                       <TableCell className="font-medium">{worker.name}</TableCell>
                       <TableCell>{getRoleBadge(worker.role)}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{worker.commission_rate}%</Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">{worker.commission_rate}%</Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openCommissionEdit(worker)}
+                            className="h-6 w-6 p-0"
+                          >
+                            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell>
                         {formatCurrency(worker.total_earnings || 0)}
@@ -641,11 +854,22 @@ export default function WorkerPayroll() {
         {/* Salary Workers Tab */}
         <TabsContent value="salary" className="space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Monthly Salary Workers</CardTitle>
-              <CardDescription>
-                Fixed salary workers and their monthly compensation
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Monthly Salary Workers</CardTitle>
+                <CardDescription>
+                  Fixed salary workers and their monthly compensation
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchWorkers}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh
+              </Button>
             </CardHeader>
             <CardContent>
               <Table>
@@ -654,6 +878,7 @@ export default function WorkerPayroll() {
                     <TableHead>Worker</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Monthly Salary</TableHead>
+                    <TableHead>Services Performed</TableHead>
                     <TableHead>Hire Date</TableHead>
                     <TableHead>Annual Cost</TableHead>
                     <TableHead>Actions</TableHead>
@@ -666,6 +891,14 @@ export default function WorkerPayroll() {
                       <TableCell>{getRoleBadge(worker.role)}</TableCell>
                       <TableCell>
                         {formatCurrency(worker.salary)}/month
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{worker.services_performed || 0}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {worker.services_performed === 1 ? 'service' : 'services'}
+                          </Badge>
+                        </div>
                       </TableCell>
                       <TableCell>
                         {new Date(worker.hire_date).toLocaleDateString()}
@@ -702,7 +935,10 @@ export default function WorkerPayroll() {
               {selectedWorker?.name} - Detailed Earnings Report
             </DialogTitle>
             <DialogDescription>
-              Complete service history and daily commission breakdown for {selectedWorker?.name}
+              {selectedWorker?.payment_type === 'commission' 
+                ? `Complete service history and daily commission breakdown for ${selectedWorker?.name}`
+                : `Complete service history and performance tracking for ${selectedWorker?.name} (Salary worker)`
+              }
             </DialogDescription>
           </DialogHeader>
           
@@ -741,6 +977,36 @@ export default function WorkerPayroll() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Salary Worker Performance Summary */}
+              {selectedWorker.payment_type === 'monthly' && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Performance Summary</CardTitle>
+                    <CardDescription>
+                      Service performance metrics for salary worker
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <div className="text-center p-4 bg-blue-50 rounded-lg">
+                        <div className="text-2xl font-bold text-blue-600">{selectedWorker.services_performed || 0}</div>
+                        <div className="text-sm text-blue-600">Total Services</div>
+                      </div>
+                      <div className="text-center p-4 bg-green-50 rounded-lg">
+                        <div className="text-2xl font-bold text-green-600">{formatCurrency(selectedWorker.salary || 0)}</div>
+                        <div className="text-sm text-green-600">Monthly Salary</div>
+                      </div>
+                      <div className="text-center p-4 bg-purple-50 rounded-lg">
+                        <div className="text-2xl font-bold text-purple-600">
+                          {selectedWorker.services_performed > 0 ? Math.round((selectedWorker.services_performed / 30) * 100) / 100 : 0}
+                        </div>
+                        <div className="text-sm text-purple-600">Avg. Services/Day</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Date Selection for Commission Workers */}
               {selectedWorker.payment_type === 'commission' && (
@@ -831,7 +1097,10 @@ export default function WorkerPayroll() {
                 <CardHeader>
                   <CardTitle>Complete Service History</CardTitle>
                   <CardDescription>
-                    All services performed by {selectedWorker.name} with commission calculations
+                    {selectedWorker.payment_type === 'commission' 
+                      ? `All services performed by ${selectedWorker.name} with commission calculations`
+                      : `All services performed by ${selectedWorker.name} (Salary worker - no commission)`
+                    }
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -842,8 +1111,16 @@ export default function WorkerPayroll() {
                         <TableHead>Service</TableHead>
                         <TableHead>Customer</TableHead>
                         <TableHead>Service Price</TableHead>
-                        <TableHead>Commission</TableHead>
+                        {selectedWorker.payment_type === 'commission' && (
+                          <>
+                            <TableHead>Commission Rate</TableHead>
+                            <TableHead>Commission Amount</TableHead>
+                          </>
+                        )}
                         <TableHead>Status</TableHead>
+                        {selectedWorker.payment_type === 'commission' && (
+                          <TableHead>Actions</TableHead>
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -855,16 +1132,50 @@ export default function WorkerPayroll() {
                           <TableCell className="font-medium">{service.service_name}</TableCell>
                           <TableCell>{service.customer_name}</TableCell>
                           <TableCell>{formatCurrency(service.service_price)}</TableCell>
-                          <TableCell>
-                            <span className="text-green-600 font-medium">
-                              {formatCurrency(service.commission_amount)}
-                            </span>
-                          </TableCell>
+                          {selectedWorker.payment_type === 'commission' && (
+                            <>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline">{service.service_commission_rate || 0}%</Badge>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => openServiceCommissionEdit(service)}
+                                    className="h-6 w-6 p-0"
+                                  >
+                                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                  </Button>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-green-600 font-medium">
+                                  {formatCurrency(service.commission_amount)}
+                                </span>
+                              </TableCell>
+                            </>
+                          )}
                           <TableCell>
                             <Badge variant="secondary" className="bg-green-100 text-green-800">
                               {service.status}
                             </Badge>
                           </TableCell>
+                          {selectedWorker.payment_type === 'commission' && (
+                            <TableCell>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openServiceCommissionEdit(service)}
+                                className="flex items-center gap-2"
+                              >
+                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                Edit Rate
+                              </Button>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
@@ -892,8 +1203,10 @@ export default function WorkerPayroll() {
             </p>
             <div className="text-sm text-blue-700 space-y-1">
               <p>• <strong>Real-Time Data:</strong> All earnings calculated from actual completed services</p>
-              <p>• <strong>Commission Workers:</strong> Earn {commissionWorkers.length > 0 ? commissionWorkers[0]?.commission_rate : 6}% of service value</p>
-              <p>• <strong>Salary Workers:</strong> Fixed monthly compensation</p>
+              <p>• <strong>Commission Workers:</strong> Earn variable commission rates based on individual worker settings</p>
+              <p>• <strong>Service-Specific Commissions:</strong> Different services can have different commission rates</p>
+              <p>• <strong>Commission Management:</strong> Edit both worker and service commission rates directly from payroll view</p>
+              <p>• <strong>Salary Workers:</strong> Fixed monthly compensation with service tracking</p>
               <p>• <strong>Daily Tracking:</strong> View commission earnings by specific dates</p>
               <p>• <strong>Service History:</strong> Complete breakdown of all services and earnings</p>
               <p>• <strong>Export Functionality:</strong> Download payroll data for accounting</p>
@@ -901,6 +1214,88 @@ export default function WorkerPayroll() {
           </div>
         </div>
       </div>
+
+      {/* Commission Rate Edit Dialog */}
+      <Dialog open={isCommissionEditOpen} onOpenChange={setIsCommissionEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Commission Rate</DialogTitle>
+            <DialogDescription>
+              Update the commission rate for {editingCommissionWorker?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid gap-2">
+              <Label htmlFor="commission-rate">Commission Rate (%)</Label>
+              <Input
+                id="commission-rate"
+                type="number"
+                value={newCommissionRate}
+                onChange={(e) => setNewCommissionRate(e.target.value)}
+                placeholder="Enter commission rate"
+                min="0"
+                max="100"
+                step="0.1"
+              />
+              <p className="text-xs text-muted-foreground">
+                Worker will earn {newCommissionRate || 0}% from each service they perform
+              </p>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsCommissionEditOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={updateCommissionRate}>
+                Update Commission Rate
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Service Commission Rate Edit Dialog */}
+      <Dialog open={isServiceCommissionEditOpen} onOpenChange={setIsServiceCommissionEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Service Commission Rate</DialogTitle>
+            <DialogDescription>
+              Update the commission rate for {editingServiceCommission?.serviceName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid gap-2">
+              <Label htmlFor="service-commission-rate">Service Commission Rate (%)</Label>
+              <Input
+                id="service-commission-rate"
+                type="number"
+                value={newServiceCommissionRate}
+                onChange={(e) => setNewServiceCommissionRate(e.target.value)}
+                placeholder="Enter commission rate"
+                min="0"
+                max="100"
+                step="0.1"
+              />
+              <p className="text-xs text-muted-foreground">
+                This service will use {newServiceCommissionRate || 0}% commission rate instead of the worker's default rate
+              </p>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsServiceCommissionEditOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={updateServiceCommissionRate}>
+                Update Service Commission Rate
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
