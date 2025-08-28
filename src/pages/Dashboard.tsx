@@ -234,7 +234,7 @@ export default function Dashboard() {
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-blue-900 mb-1">System Updates & Maintenance</h3>
             <p className="text-sm text-blue-700 leading-relaxed">
-              This system is actively maintained and enhanced by <strong>Our Team</strong>. 
+              This system is actively maintained and enhanced by <strong>Devzora Technologies</strong>. 
               Future updates will include new features, security improvements, and performance optimizations. 
               For technical support or feature requests, please contact our development team.
             </p>
@@ -490,7 +490,7 @@ export default function Dashboard() {
                   </span>
                 </div>
                 <p className="text-2xl font-bold text-blue-900">0</p>
-                <p className="text-xs text-blue-600 mt-1">Coming soon</p>
+                <p className="text-xs text-blue-600 mt-1">Coming soon by Devzora</p>
               </div>
               <Calendar className="h-8 w-8 text-blue-500" />
             </div>

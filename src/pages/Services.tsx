@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { ReceiptDialog } from "@/components/services/ReceiptDialog";
+import { updateWorkerEarnings } from "@/utils/workerEarnings";
 
 interface Service {
   id: string;
@@ -322,6 +323,25 @@ export default function Services() {
         }
 
         toast({ title: "Success", description: "Service created successfully" });
+        
+        // Calculate worker earnings if staff member is assigned and service is completed
+        if (formData.staff_member_id && formData.status === 'completed') {
+          try {
+            const result = await updateWorkerEarnings(
+              formData.staff_member_id,
+              parseFloat(formData.service_price) || 0,
+              formData.date_time
+            );
+            
+            if (result.success) {
+              console.log("Worker earnings updated:", result.message);
+            } else {
+              console.warn("Failed to update worker earnings:", result.message);
+            }
+          } catch (earningsError) {
+            console.error("Error updating worker earnings:", earningsError);
+          }
+        }
       }
 
       setIsDialogOpen(false);

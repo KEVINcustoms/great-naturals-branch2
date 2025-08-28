@@ -20,6 +20,8 @@ import { EmailConfirmation } from "./components/auth/EmailConfirmation";
 import { Profile } from "@/hooks/useAuth";
 import { isAdmin } from "@/utils/permissions";
 import { AccessControl } from "@/components/ui/AccessControl";
+import WorkerPayroll from "./pages/WorkerPayroll";
+import FinancialAnalytics from "./pages/FinancialAnalytics";
 
 const queryClient = new QueryClient();
 
@@ -85,6 +87,16 @@ function AppContent() {
           <Route path="/admin" element={
             <AdminRoute profile={profile}>
               <AdminManagement />
+            </AdminRoute>
+          } />
+          <Route path="/worker-payroll" element={
+            <AdminRoute profile={profile}>
+              <WorkerPayroll />
+            </AdminRoute>
+          } />
+          <Route path="/financial-analytics" element={
+            <AdminRoute profile={profile}>
+              <FinancialAnalytics />
             </AdminRoute>
           } />
           <Route path="/settings" element={

@@ -11,6 +11,8 @@ import {
   ShoppingBag,
   Shield,
   User,
+  DollarSign,
+  BarChart3,
 } from "lucide-react";
 import {
   Sidebar,
@@ -41,6 +43,8 @@ const allMenuItems = [
 
 const adminItems = [
   { title: "Admin Management", url: "/admin", icon: Shield },
+  { title: "Worker Payroll", url: "/worker-payroll", icon: DollarSign },
+  { title: "Financial Analytics", url: "/financial-analytics", icon: BarChart3 },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 

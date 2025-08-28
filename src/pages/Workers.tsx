@@ -19,6 +19,8 @@ interface Worker {
   phone: string | null;
   role: string;
   salary: number;
+  payment_type?: 'monthly' | 'commission';
+  commission_rate?: number;
   payment_status: string;
   hire_date: string;
   created_at: string;
@@ -37,6 +39,8 @@ export default function Workers() {
     phone: "",
     role: "",
     salary: "",
+    payment_type: 'monthly' as 'monthly' | 'commission',
+    commission_rate: 6,
     payment_status: "pending",
     hire_date: "",
   });
@@ -83,6 +87,8 @@ export default function Workers() {
             phone: formData.phone || null,
             role: formData.role,
             salary: parseFloat(formData.salary) || 0,
+            payment_type: formData.payment_type,
+            commission_rate: parseFloat(formData.commission_rate.toString()) || 0,
             payment_status: formData.payment_status,
             hire_date: formData.hire_date,
           })
@@ -99,6 +105,8 @@ export default function Workers() {
             phone: formData.phone || null,
             role: formData.role,
             salary: parseFloat(formData.salary) || 0,
+            payment_type: formData.payment_type,
+            commission_rate: parseFloat(formData.commission_rate.toString()) || 0,
             payment_status: formData.payment_status,
             hire_date: formData.hire_date,
             created_by: user.id,
@@ -110,7 +118,7 @@ export default function Workers() {
 
       setIsDialogOpen(false);
       setEditingWorker(null);
-      setFormData({ name: "", email: "", phone: "", role: "", salary: "", payment_status: "pending", hire_date: "" });
+      setFormData({ name: "", email: "", phone: "", role: "", salary: "", payment_status: "pending", hire_date: "", payment_type: 'monthly', commission_rate: 6 });
       fetchWorkers();
     } catch (error) {
       console.error("Error saving worker:", error);
@@ -153,12 +161,14 @@ export default function Workers() {
         phone: worker.phone || "",
         role: worker.role,
         salary: worker.salary.toString(),
+        payment_type: worker.payment_type || 'monthly',
+        commission_rate: worker.commission_rate || 6,
         payment_status: worker.payment_status,
         hire_date: worker.hire_date,
       });
     } else {
       setEditingWorker(null);
-      setFormData({ name: "", email: "", phone: "", role: "", salary: "", payment_status: "pending", hire_date: new Date().toISOString().split('T')[0] });
+      setFormData({ name: "", email: "", phone: "", role: "", salary: "", payment_status: "pending", hire_date: new Date().toISOString().split('T')[0], payment_type: 'monthly', commission_rate: 6 });
     }
     setIsDialogOpen(true);
   };
@@ -177,6 +187,7 @@ export default function Workers() {
       'manager': 'bg-indigo-100 text-indigo-800 border-indigo-200',
       'assistant': 'bg-green-100 text-green-800 border-green-200',
       'trainee': 'bg-orange-100 text-orange-800 border-orange-200',
+      'barber': 'bg-gray-100 text-gray-800 border-gray-200',
     };
     
     const colorClass = roleColors[role.toLowerCase()] || 'bg-gray-100 text-gray-800 border-gray-200';
@@ -226,7 +237,7 @@ export default function Workers() {
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-blue-900 mb-1">System Updates & Maintenance</h3>
             <p className="text-sm text-blue-700 leading-relaxed">
-              This system is actively maintained and enhanced by <strong>Our Team</strong>. 
+              This system is actively maintained and enhanced by <strong>Devzora Technologies</strong>. 
               Future updates will include new features, security improvements, and performance optimizations. 
               For technical support or feature requests, please contact our development team.
             </p>
@@ -239,10 +250,71 @@ export default function Workers() {
           <h1 className="text-3xl font-bold text-gray-900">Workers Management</h1>
           <p className="text-gray-600">Manage your salon staff and their schedules</p>
         </div>
-        <Button onClick={() => setIsDialogOpen(true)}>
+        <Button onClick={() => openDialog()}>
           <Plus className="h-4 w-4 mr-2" />
           Add Worker
         </Button>
+      </div>
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-emerald-50 to-teal-50">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-emerald-100 rounded-full">
+                <Users className="h-6 w-6 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-emerald-600">Total Workers</p>
+                <p className="text-2xl font-bold text-emerald-900">{workers.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-indigo-50">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-blue-100 rounded-full">
+                <UserCheck className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-blue-600">Active Workers</p>
+                <p className="text-2xl font-bold text-blue-900">{workers.filter(w => w.payment_status !== 'overdue').length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-amber-50 to-orange-50">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-amber-100 rounded-full">
+                <DollarSign className="h-6 w-6 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-amber-600">Monthly Salary</p>
+                <p className="text-2xl font-bold text-amber-900">
+                  {formatCurrency(workers.filter(w => w.payment_type === 'monthly').reduce((sum, w) => sum + w.salary, 0))}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-50 to-pink-50">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-purple-100 rounded-full">
+                <TrendingUp className="h-6 w-6 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-purple-600">Commission Workers</p>
+                <p className="text-2xl font-bold text-purple-900">{workers.filter(w => w.payment_type === 'commission').length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-emerald-50/50">
@@ -273,8 +345,8 @@ export default function Workers() {
                   <TableHead className="text-emerald-800 font-semibold">Name</TableHead>
                   <TableHead className="text-emerald-800 font-semibold">Contact</TableHead>
                   <TableHead className="text-emerald-800 font-semibold">Role</TableHead>
-                  <TableHead className="text-emerald-800 font-semibold">Salary</TableHead>
-                  <TableHead className="text-emerald-800 font-semibold">Payment Status</TableHead>
+                  <TableHead className="text-emerald-800 font-semibold">Payment</TableHead>
+                  <TableHead className="text-emerald-800 font-semibold">Earnings</TableHead>
                   <TableHead className="text-emerald-800 font-semibold">Hire Date</TableHead>
                   <TableHead className="text-emerald-800 font-semibold text-right">Actions</TableHead>
                 </TableRow>
@@ -305,11 +377,41 @@ export default function Workers() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <DollarSign className="h-4 w-4 text-emerald-500" />
+                        <div className="flex flex-col">
+                          {worker.payment_type === 'commission' ? (
+                            <>
+                              <span className="font-semibold text-emerald-700">Commission Based</span>
+                              <span className="text-xs text-gray-500">{worker.commission_rate || 6}% per service</span>
+                            </>
+                          ) : (
+                            <>
                         <span className="font-semibold text-emerald-700">{formatCurrency(worker.salary)}</span>
+                              <span className="text-xs text-gray-500">Monthly Salary</span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      {getPaymentStatusBadge(worker.payment_status)}
+                      <div className="flex items-center gap-2">
+                        {worker.payment_type === 'commission' ? (
+                          <>
+                            <TrendingUp className="h-4 w-4 text-blue-500" />
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-blue-700">Daily Earnings</span>
+                              <span className="text-xs text-gray-500">Based on services performed</span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <Calendar className="h-4 w-4 text-emerald-500" />
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-emerald-700">{formatCurrency(worker.salary)}</span>
+                              <span className="text-xs text-gray-500">Monthly</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -322,10 +424,7 @@ export default function Workers() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => {
-                            setEditingWorker(worker);
-                            setIsDialogOpen(true);
-                          }}
+                          onClick={() => openDialog(worker)}
                           className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                         >
                           <Edit className="h-4 w-4" />
@@ -344,12 +443,8 @@ export default function Workers() {
                 ))}
                 {filteredWorkers.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      <div className="flex flex-col items-center gap-2">
-                        <Users className="h-12 w-12 text-gray-300" />
-                        <p>No workers found</p>
-                        <p className="text-sm">Start by adding your first team member</p>
-                      </div>
+                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                      {searchQuery ? "No workers found matching your search." : "No workers found. Add your first worker to get started."}
                     </TableCell>
                   </TableRow>
                 )}
@@ -408,6 +503,23 @@ export default function Workers() {
                 />
               </div>
               <div className="grid gap-2">
+                <Label htmlFor="payment_type">Payment Type *</Label>
+                <Select 
+                  value={formData.payment_type} 
+                  onValueChange={(value: 'monthly' | 'commission') => setFormData({ ...formData, payment_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">Monthly Salary</SelectItem>
+                    <SelectItem value="commission">Commission Based (6%)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {formData.payment_type === 'monthly' ? (
+              <div className="grid gap-2">
                 <Label htmlFor="salary">Monthly Salary *</Label>
                 <Input
                   id="salary"
@@ -418,6 +530,25 @@ export default function Workers() {
                   required
                 />
               </div>
+              ) : (
+                <div className="grid gap-2">
+                  <Label htmlFor="commission_rate">Commission Rate (%)</Label>
+                  <Input
+                    id="commission_rate"
+                    type="number"
+                    value={formData.commission_rate}
+                    onChange={(e) => setFormData({ ...formData, commission_rate: e.target.value })}
+                    placeholder="6"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Worker will earn {formData.commission_rate}% from each service they perform
+                  </p>
+                </div>
+              )}
+              
               <div className="grid gap-2">
                 <Label htmlFor="payment_status">Payment Status</Label>
                 <Select value={formData.payment_status} onValueChange={(value) => setFormData({ ...formData, payment_status: value })}>
