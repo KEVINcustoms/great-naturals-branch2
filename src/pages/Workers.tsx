@@ -449,7 +449,7 @@ export default function Workers() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
           <form onSubmit={handleSubmit}>
             <DialogHeader>
               <DialogTitle>
@@ -460,118 +460,132 @@ export default function Workers() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Name *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="role">Role *</Label>
-                <Input
-                  id="role"
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  placeholder="e.g., Hair Stylist, Receptionist"
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="payment_type">Payment Type *</Label>
-                <Select 
-                  value={formData.payment_type} 
-                  onValueChange={(value: 'monthly' | 'commission') => setFormData({ ...formData, payment_type: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="monthly">Monthly Salary</SelectItem>
-                    <SelectItem value="commission">Commission Based (%)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {formData.payment_type === 'monthly' ? (
-              <div className="grid gap-2">
-                <Label htmlFor="salary">Monthly Salary *</Label>
-                <Input
-                  id="salary"
-                  type="number"
-                  value={formData.salary}
-                  onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
-                  placeholder="0"
-                  required
-                />
-              </div>
-              ) : (
+              {/* Basic Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="commission_rate">Commission Rate (%)</Label>
+                  <Label htmlFor="name">Name *</Label>
                   <Input
-                    id="commission_rate"
-                    type="number"
-                    value={formData.commission_rate}
-                    onChange={(e) => setFormData({ ...formData, commission_rate: e.target.value })}
-                    placeholder="6"
-                    min="0"
-                    max="100"
-                    step="0.1"
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
                   />
-                  <p className="text-xs text-gray-500">
-                    Worker will earn {formData.commission_rate}% from each service they perform
-                  </p>
                 </div>
-              )}
-              
-              <div className="grid gap-2">
-                <Label htmlFor="payment_status">Payment Status</Label>
-                <Select value={formData.payment_status} onValueChange={(value) => setFormData({ ...formData, payment_status: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
-                    <SelectItem value="overdue">Overdue</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="grid gap-2">
+                  <Label htmlFor="role">Role *</Label>
+                  <Input
+                    id="role"
+                    value={formData.role}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                    placeholder="e.g., Hair Stylist, Receptionist"
+                    required
+                  />
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="hire_date">Hire Date *</Label>
-                <Input
-                  id="hire_date"
-                  type="date"
-                  value={formData.hire_date}
-                  onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
-                  required
-                />
+
+              {/* Contact Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Payment Information */}
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="payment_type">Payment Type *</Label>
+                  <Select 
+                    value={formData.payment_type} 
+                    onValueChange={(value: 'monthly' | 'commission') => setFormData({ ...formData, payment_type: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="monthly">Monthly Salary</SelectItem>
+                      <SelectItem value="commission">Commission Based (%)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {formData.payment_type === 'monthly' ? (
+                <div className="grid gap-2">
+                  <Label htmlFor="salary">Monthly Salary *</Label>
+                  <Input
+                    id="salary"
+                    type="number"
+                    value={formData.salary}
+                    onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
+                    placeholder="0"
+                    required
+                  />
+                </div>
+                ) : (
+                  <div className="grid gap-2">
+                    <Label htmlFor="commission_rate">Commission Rate (%)</Label>
+                    <Input
+                      id="commission_rate"
+                      type="number"
+                      value={formData.commission_rate}
+                      onChange={(e) => setFormData({ ...formData, commission_rate: e.target.value })}
+                      placeholder="6"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Worker will earn {formData.commission_rate}% from each service they perform
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Status and Date */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="payment_status">Payment Status</Label>
+                  <Select value={formData.payment_status} onValueChange={(value) => setFormData({ ...formData, payment_status: value })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="paid">Paid</SelectItem>
+                      <SelectItem value="overdue">Overdue</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="hire_date">Hire Date *</Label>
+                  <Input
+                    id="hire_date"
+                    type="date"
+                    value={formData.hire_date}
+                    onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
+                    required
+                  />
+                </div>
               </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0 sm:justify-end">
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto">
                 Cancel
               </Button>
-              <Button type="submit">
+              <Button type="submit" className="w-full sm:w-auto">
                 {editingWorker ? "Update" : "Create"}
               </Button>
             </DialogFooter>

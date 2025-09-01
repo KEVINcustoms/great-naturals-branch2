@@ -610,7 +610,7 @@ export default function Customers() {
       </Tabs>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-md border-0 shadow-2xl">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto border-0 shadow-2xl">
           <form onSubmit={handleSubmit}>
             <DialogHeader className="bg-gradient-to-r from-purple-50 to-pink-50 p-6 -m-6 mb-6 rounded-t-lg">
               <DialogTitle className="text-purple-800">
@@ -621,16 +621,30 @@ export default function Customers() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name" className="text-gray-700 font-medium">Name *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                  className="border-gray-200 focus:border-purple-400 focus:ring-purple-400"
-                />
+              {/* Basic Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="name" className="text-gray-700 font-medium">Name *</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                    className="border-gray-200 focus:border-purple-400 focus:ring-purple-400"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="phone" className="text-gray-700 font-medium">Phone</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="border-gray-200 focus:border-purple-400 focus:ring-purple-400"
+                  />
+                </div>
               </div>
+
+              {/* Contact Information */}
               <div className="grid gap-2">
                 <Label htmlFor="email" className="text-gray-700 font-medium">Email</Label>
                 <Input
@@ -641,35 +655,32 @@ export default function Customers() {
                   className="border-gray-200 focus:border-purple-400 focus:ring-purple-400"
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="phone" className="text-gray-700 font-medium">Phone</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="border-gray-200 focus:border-purple-400 focus:ring-purple-400"
-                />
+
+              {/* Hair Profile */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="hair_type" className="text-gray-700 font-medium">Hair Type</Label>
+                  <Input
+                    id="hair_type"
+                    value={formData.hair_type}
+                    onChange={(e) => setFormData({ ...formData, hair_type: e.target.value })}
+                    placeholder="e.g., Curly, Straight, Wavy"
+                    className="border-gray-200 focus:border-purple-400 focus:ring-purple-400"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="style_preference" className="text-gray-700 font-medium">Style Preference</Label>
+                  <Input
+                    id="style_preference"
+                    value={formData.style_preference}
+                    onChange={(e) => setFormData({ ...formData, style_preference: e.target.value })}
+                    placeholder="e.g., Long layers, Bob cut"
+                    className="border-gray-200 focus:border-purple-400 focus:ring-purple-400"
+                  />
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="hair_type" className="text-gray-700 font-medium">Hair Type</Label>
-                <Input
-                  id="hair_type"
-                  value={formData.hair_type}
-                  onChange={(e) => setFormData({ ...formData, hair_type: e.target.value })}
-                  placeholder="e.g., Curly, Straight, Wavy"
-                  className="border-gray-200 focus:border-purple-400 focus:ring-purple-400"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="style_preference" className="text-gray-700 font-medium">Style Preference</Label>
-                <Input
-                  id="style_preference"
-                  value={formData.style_preference}
-                  onChange={(e) => setFormData({ ...formData, style_preference: e.target.value })}
-                  placeholder="e.g., Long layers, Bob cut"
-                  className="border-gray-200 focus:border-purple-400 focus:ring-purple-400"
-                />
-              </div>
+
+              {/* Notes */}
               <div className="grid gap-2">
                 <Label htmlFor="notes" className="text-gray-700 font-medium">Notes</Label>
                 <Textarea
@@ -682,13 +693,13 @@ export default function Customers() {
                 />
               </div>
             </div>
-            <DialogFooter className="bg-gray-50 p-6 -m-6 mt-6 rounded-b-lg">
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="border-gray-300">
+            <DialogFooter className="bg-gray-50 p-6 -m-6 mt-6 rounded-b-lg flex flex-col sm:flex-row gap-2 sm:gap-0 sm:justify-end">
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="border-gray-300 w-full sm:w-auto">
                 Cancel
               </Button>
               <Button 
                 type="submit" 
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white w-full sm:w-auto"
               >
                 {editingCustomer ? "Update" : "Create"}
               </Button>
