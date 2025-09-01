@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingUp, TrendingDown, Box, DollarSign, Calendar, Tag, BarChart3, Receipt } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingUp, TrendingDown, Box, DollarSign, Calendar, Tag, BarChart3, Receipt, RefreshCw, ShoppingCart, X, Minus, CreditCard } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,7 +56,65 @@ interface Transaction {
   };
 }
 
+// Cart interfaces
+interface CartItem {
+  id: string;
+  name: string;
+  unit_price: number;
+  quantity: number;
+  current_stock: number;
+  supplier: string | null;
+  category_id: string | null;
+}
+
+interface Cart {
+  items: CartItem[];
+  total: number;
+  itemCount: number;
+}
+
 export default function Inventory() {
+  // Add CSS animations for cart
+  useEffect(() => {
+    // Add custom CSS for cart animations
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes slideInFromRight {
+        0% {
+          opacity: 0;
+          transform: translateX(100%);
+        }
+        100% {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+      
+      @keyframes slideOutToRight {
+        0% {
+          opacity: 1;
+          transform: translateX(0);
+        }
+        100% {
+          opacity: 0;
+          transform: translateX(100%);
+        }
+      }
+      
+      .cart-item-enter {
+        animation: slideInFromRight 0.3s ease-out forwards;
+      }
+      
+      .cart-item-exit {
+        animation: slideOutToRight 0.3s ease-out forwards;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -66,7 +124,36 @@ export default function Inventory() {
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("inventory");
+  const [activeTab, setActiveTab] = useState("shop");
+  
+  // Cart state with persistence
+  const [cart, setCart] = useState<Cart>(() => {
+    // Load cart from localStorage on component mount
+    const savedCart = localStorage.getItem('salon-cart');
+    if (savedCart) {
+      try {
+        const parsedCart = JSON.parse(savedCart);
+        // Validate the saved cart structure and remove timestamp
+        if (parsedCart.items && Array.isArray(parsedCart.items)) {
+          const { lastUpdated, ...cartData } = parsedCart;
+          return cartData;
+        }
+      } catch (error) {
+        console.error('Error parsing saved cart:', error);
+      }
+    }
+    return { items: [], total: 0, itemCount: 0 };
+  });
+  
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [checkoutData, setCheckoutData] = useState({
+    customerName: "",
+    customerPhone: "",
+    paymentMethod: "cash",
+    referenceNumber: "",
+  });
+  
   const [formData, setFormData] = useState({
     name: "",
     current_stock: "",
@@ -95,6 +182,127 @@ export default function Inventory() {
 
   useEffect(() => {
     fetchData();
+    
+    // Validate cart items against current inventory after data loads
+    if (cart.items.length > 0) {
+      validateCartItems();
+    }
+
+    // Set up real-time subscriptions for automatic updates
+    const inventoryItemsSubscription = supabase
+      .channel('inventory_items_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'inventory_items'
+        },
+        (payload) => {
+          console.log('Inventory items table changed:', payload);
+          // Refresh inventory data when changes occur
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    const inventoryTransactionsSubscription = supabase
+      .channel('inventory_transactions_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'inventory_transactions'
+        },
+        (payload) => {
+          console.log('Inventory transactions table changed:', payload);
+          // Refresh inventory data when transactions occur
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    const serviceProductsSubscription = supabase
+      .channel('service_products_changes_inventory')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'service_products'
+        },
+        (payload) => {
+          console.log('Service products table changed (inventory):', payload);
+          // Refresh inventory data when service products change
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    const servicesSubscription = supabase
+      .channel('services_changes_inventory')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'services'
+        },
+        (payload) => {
+          console.log('Services table changed (inventory):', payload);
+          // Refresh inventory data when services change
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    // Listen for custom events from other pages that indicate inventory data changes
+    const handleInventoryDataChanged = (event: CustomEvent) => {
+      console.log('Inventory data change detected:', event.detail);
+      // Refresh inventory data when services are updated
+      fetchData();
+    };
+
+    window.addEventListener('inventory-data-changed', handleInventoryDataChanged as EventListener);
+
+    // Cleanup subscriptions and event listeners on unmount
+    return () => {
+      inventoryItemsSubscription.unsubscribe();
+      inventoryTransactionsSubscription.unsubscribe();
+      serviceProductsSubscription.unsubscribe();
+      servicesSubscription.unsubscribe();
+      window.removeEventListener('inventory-data-changed', handleInventoryDataChanged as EventListener);
+    };
+  }, []);
+
+  // Clean up expired cart data (older than 7 days)
+  useEffect(() => {
+    const cleanupExpiredCart = () => {
+      const cartData = localStorage.getItem('salon-cart');
+      if (cartData) {
+        try {
+          const parsedCart = JSON.parse(cartData);
+          // If cart is older than 7 days, clear it
+          const cartAge = Date.now() - new Date(parsedCart.lastUpdated || 0).getTime();
+          const sevenDays = 7 * 24 * 60 * 60 * 1000;
+          
+          if (cartAge > sevenDays) {
+            localStorage.removeItem('salon-cart');
+            setCart({ items: [], total: 0, itemCount: 0 });
+          }
+        } catch (error) {
+          console.error('Error checking cart age:', error);
+          localStorage.removeItem('salon-cart');
+        }
+      }
+    };
+
+    cleanupExpiredCart();
+    // Check every hour
+    const interval = setInterval(cleanupExpiredCart, 60 * 60 * 1000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const fetchData = async () => {
@@ -341,6 +549,290 @@ export default function Inventory() {
     setIsReceiptOpen(true);
   };
 
+  // Cart persistence helper
+  const saveCartToStorage = (cartData: Cart) => {
+    try {
+      const cartWithTimestamp = {
+        ...cartData,
+        lastUpdated: new Date().toISOString()
+      };
+      localStorage.setItem('salon-cart', JSON.stringify(cartWithTimestamp));
+    } catch (error) {
+      console.error('Error saving cart to localStorage:', error);
+    }
+  };
+
+  // Validate cart items against current inventory
+  const validateCartItems = () => {
+    if (items.length === 0 || cart.items.length === 0) return;
+    
+    let cartUpdated = false;
+    const validatedItems = cart.items.filter(cartItem => {
+      const inventoryItem = items.find(item => item.id === cartItem.id);
+      
+      if (!inventoryItem) {
+        // Item no longer exists in inventory
+        cartUpdated = true;
+        return false;
+      }
+      
+      if (inventoryItem.current_stock < cartItem.quantity) {
+        // Adjust quantity to available stock
+        cartUpdated = true;
+        return true; // Keep item but will update quantity
+      }
+      
+      return true;
+    }).map(cartItem => {
+      const inventoryItem = items.find(item => item.id === cartItem.id);
+      if (inventoryItem && inventoryItem.current_stock < cartItem.quantity) {
+        // Adjust quantity to available stock
+        return { ...cartItem, quantity: inventoryItem.current_stock };
+      }
+      return cartItem;
+    });
+    
+    if (cartUpdated) {
+      const newTotal = validatedItems.reduce((sum, cartItem) => 
+        sum + (cartItem.unit_price * cartItem.quantity), 0
+      );
+      
+      const newCart = {
+        items: validatedItems,
+        total: newTotal,
+        itemCount: validatedItems.reduce((sum, cartItem) => sum + cartItem.quantity, 0)
+      };
+      
+      setCart(newCart);
+      saveCartToStorage(newCart);
+      
+      if (validatedItems.length < cart.items.length) {
+        toast({
+          title: "Cart Updated",
+          description: "Some items were removed or quantities adjusted due to stock changes",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  // Cart functions
+  const addToCart = (item: InventoryItem) => {
+    if (item.current_stock <= 0) {
+      toast({
+        title: "Out of Stock",
+        description: `${item.name} is currently out of stock`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setCart(prevCart => {
+      const existingItem = prevCart.items.find(cartItem => cartItem.id === item.id);
+      
+      if (existingItem) {
+        // Check if adding more would exceed stock
+        if (existingItem.quantity + 1 > item.current_stock) {
+          toast({
+            title: "Stock Limit Reached",
+            description: `Cannot add more ${item.name}. Only ${item.current_stock} available.`,
+            variant: "destructive",
+          });
+          return prevCart;
+        }
+        
+        // Update existing item quantity
+        const updatedItems = prevCart.items.map(cartItem =>
+          cartItem.id === item.id
+            ? { ...cartItem, quantity: cartItem.quantity + 1 }
+            : cartItem
+        );
+        
+        const newTotal = updatedItems.reduce((sum, cartItem) => 
+          sum + (cartItem.unit_price * cartItem.quantity), 0
+        );
+        
+        const newCart = {
+          items: updatedItems,
+          total: newTotal,
+          itemCount: updatedItems.reduce((sum, cartItem) => sum + cartItem.quantity, 0)
+        };
+        saveCartToStorage(newCart);
+        return newCart;
+      } else {
+        // Add new item to cart
+        const newItem: CartItem = {
+          id: item.id,
+          name: item.name,
+          unit_price: item.unit_price,
+          quantity: 1,
+          current_stock: item.current_stock,
+          supplier: item.supplier,
+          category_id: item.category_id,
+        };
+        
+        const newItems = [...prevCart.items, newItem];
+        const newTotal = newItems.reduce((sum, cartItem) => 
+          sum + (cartItem.unit_price * cartItem.quantity), 0
+        );
+        
+        const newCart = {
+          items: newItems,
+          total: newTotal,
+          itemCount: newItems.reduce((sum, cartItem) => sum + cartItem.quantity, 0)
+        };
+        saveCartToStorage(newCart);
+        return newCart;
+      }
+    });
+
+    toast({
+      title: "Added to Cart",
+      description: `${item.name} added to cart`,
+    });
+  };
+
+  const removeFromCart = (itemId: string) => {
+    setCart(prevCart => {
+      const updatedItems = prevCart.items.filter(item => item.id !== itemId);
+      const newTotal = updatedItems.reduce((sum, cartItem) => 
+        sum + (cartItem.unit_price * cartItem.quantity), 0
+      );
+      
+      const newCart = {
+        items: updatedItems,
+        total: newTotal,
+        itemCount: updatedItems.reduce((sum, cartItem) => sum + cartItem.quantity, 0)
+      };
+      saveCartToStorage(newCart);
+      return newCart;
+    });
+  };
+
+  const updateCartItemQuantity = (itemId: string, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      removeFromCart(itemId);
+      return;
+    }
+
+    setCart(prevCart => {
+      const updatedItems = prevCart.items.map(item => {
+        if (item.id === itemId) {
+          // Check if new quantity exceeds stock
+          if (newQuantity > item.current_stock) {
+            toast({
+              title: "Stock Limit Reached",
+              description: `Cannot add more ${item.name}. Only ${item.current_stock} available.`,
+              variant: "destructive",
+            });
+            return item; // Keep current quantity
+          }
+          return { ...item, quantity: newQuantity };
+        }
+        return item;
+      });
+      
+      const newTotal = updatedItems.reduce((sum, cartItem) => 
+        sum + (cartItem.unit_price * cartItem.quantity), 0
+      );
+      
+      const newCart = {
+        items: updatedItems,
+        total: newTotal,
+        itemCount: updatedItems.reduce((sum, cartItem) => sum + cartItem.quantity, 0)
+      };
+      saveCartToStorage(newCart);
+      return newCart;
+    });
+  };
+
+  const clearCart = () => {
+    const emptyCart = { items: [], total: 0, itemCount: 0 };
+    setCart(emptyCart);
+    saveCartToStorage(emptyCart);
+    toast({
+      title: "Cart Cleared",
+      description: "All items removed from cart",
+    });
+  };
+
+  const handleCheckout = async () => {
+    if (cart.items.length === 0) {
+      toast({
+        title: "Empty Cart",
+        description: "Please add items to cart before checkout",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!checkoutData.customerName.trim()) {
+      toast({
+        title: "Customer Name Required",
+        description: "Please enter customer name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Process each item in cart
+      for (const cartItem of cart.items) {
+        // Create inventory transaction for stock out
+        const { error: transactionError } = await supabase
+          .from("inventory_transactions")
+          .insert({
+            item_id: cartItem.id,
+            transaction_type: 'stock_out',
+            quantity: cartItem.quantity,
+            unit_price: cartItem.unit_price,
+            total_amount: cartItem.unit_price * cartItem.quantity,
+            reason: `Sale to ${checkoutData.customerName}`,
+            reference_number: checkoutData.referenceNumber || `SALE-${Date.now()}`,
+            created_by: user?.id,
+          });
+
+        if (transactionError) throw transactionError;
+
+        // Update inventory stock
+        const { error: updateError } = await supabase
+          .from("inventory_items")
+          .update({ 
+            current_stock: cartItem.current_stock - cartItem.quantity 
+          })
+          .eq("id", cartItem.id);
+
+        if (updateError) throw updateError;
+      }
+
+      toast({
+        title: "Sale Completed",
+        description: `Successfully sold ${cart.itemCount} items for ${formatCurrency(cart.total)}`,
+      });
+
+      // Clear cart and close checkout
+      clearCart();
+      setIsCheckoutOpen(false);
+      setCheckoutData({
+        customerName: "",
+        customerPhone: "",
+        paymentMethod: "cash",
+        referenceNumber: "",
+      });
+
+      // Refresh inventory data
+      fetchData();
+
+    } catch (error) {
+      console.error("Error during checkout:", error);
+      toast({
+        title: "Checkout Error",
+        description: "Failed to complete sale. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const filteredItems = items.filter((item) =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (item.supplier && item.supplier.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -423,6 +915,20 @@ export default function Inventory() {
         </div>
         <div className="flex items-center gap-2">
           <Button 
+            onClick={() => {
+              fetchData();
+              toast({
+                title: "🔄 Refreshed",
+                description: "Inventory data refreshed successfully",
+              });
+            }}
+            variant="outline"
+            className="border-green-200 text-green-700 hover:bg-green-50"
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
+          <Button 
             variant="outline"
             onClick={() => setIsTransactionDialogOpen(true)}
             className="border-green-200 text-green-700 hover:bg-green-50 hover:border-green-300"
@@ -430,6 +936,22 @@ export default function Inventory() {
             <BarChart3 className="mr-2 h-4 w-4" />
             Record Transaction
           </Button>
+          
+          {/* Shopping Cart Button */}
+          <Button 
+            onClick={() => setIsCartOpen(true)}
+            variant="outline"
+            className="border-blue-200 text-blue-700 hover:bg-blue-50 relative"
+          >
+            <ShoppingCart className="mr-2 h-4 w-4" />
+            Cart
+            {cart.itemCount > 0 && (
+              <Badge className="ml-2 bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">
+                {cart.itemCount}
+              </Badge>
+            )}
+          </Button>
+          
           <Button 
             onClick={() => setIsDialogOpen(true)}
             className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
@@ -441,13 +963,20 @@ export default function Inventory() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-gray-100 p-1">
+        <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1">
           <TabsTrigger 
             value="inventory" 
             className="data-[state=active]:bg-white data-[state=active]:text-green-600 data-[state=active]:shadow-sm"
           >
             <Package className="mr-2 h-4 w-4" />
             Inventory Items
+          </TabsTrigger>
+          <TabsTrigger 
+            value="shop" 
+            className="data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm"
+          >
+            <ShoppingCart className="mr-2 h-4 w-4" />
+            Shop
           </TabsTrigger>
           <TabsTrigger 
             value="transactions" 
@@ -545,6 +1074,17 @@ export default function Inventory() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end space-x-2">
+                            {/* Add to Cart Button */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => addToCart(item)}
+                              disabled={item.current_stock <= 0}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title={item.current_stock <= 0 ? "Out of Stock" : "Add to Cart"}
+                            >
+                              <ShoppingCart className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -592,6 +1132,89 @@ export default function Inventory() {
                     )}
                   </TableBody>
                 </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="shop" className="mt-6">
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-blue-50/50">
+            <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-blue-100">
+              <CardTitle className="text-blue-800">Product Shop</CardTitle>
+              <CardDescription className="text-blue-600">
+                Browse and purchase products from your inventory
+              </CardDescription>
+              <div className="flex items-center space-x-2">
+                <Search className="h-4 w-4 text-blue-500" />
+                <Input
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="max-w-sm border-blue-200 focus:border-blue-400 focus:ring-blue-400"
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {filteredItems.map((item) => (
+                    <div key={item.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all duration-200 transform hover:scale-[1.02]">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-gray-900 text-lg">{item.name}</h3>
+                          {item.supplier && (
+                            <p className="text-sm text-gray-500 flex items-center gap-1">
+                              <Tag className="h-3 w-3" />
+                              {item.supplier}
+                            </p>
+                          )}
+                        </div>
+                        {item.category_id && (
+                          <div className="ml-2">
+                            {getCategoryBadge(categories.find(c => c.id === item.category_id)?.name || 'Unknown')}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xl font-bold text-blue-600">{formatCurrency(item.unit_price)}</span>
+                          {getStockStatusBadge(item.current_stock, item.min_stock_level)}
+                        </div>
+                        
+                        <div className="text-sm text-gray-600">
+                          <p>Available: {item.current_stock} units</p>
+                          {item.expiry_date && (
+                            <p>Expires: {new Date(item.expiry_date).toLocaleDateString()}</p>
+                          )}
+                        </div>
+                        
+                        <Button
+                          onClick={() => addToCart(item)}
+                          disabled={item.current_stock <= 0}
+                          className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02]"
+                        >
+                          <ShoppingCart className="mr-2 h-4 w-4" />
+                          {item.current_stock <= 0 ? 'Out of Stock' : 'Add to Cart'}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {filteredItems.length === 0 && (
+                    <div className="col-span-full text-center py-8 text-muted-foreground">
+                      <div className="flex flex-col items-center gap-2">
+                        <ShoppingCart className="h-12 w-12 text-gray-300" />
+                        <p>No products found</p>
+                        <p className="text-sm">Try adjusting your search or add new inventory items</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -874,6 +1497,269 @@ export default function Inventory() {
         onClose={() => setIsReceiptOpen(false)}
         transaction={selectedTransaction}
       />
+
+      {/* Shopping Cart Sidebar */}
+      <div className={`fixed inset-y-0 right-0 w-96 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-50 ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        {/* Cart Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-cyan-50">
+          <div className="flex items-center gap-3">
+            <ShoppingCart className="h-6 w-6 text-blue-600" />
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Shopping Cart</h2>
+              <p className="text-sm text-gray-600">{cart.itemCount} items</p>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsCartOpen(false)}
+            className="h-8 w-8 p-0 hover:bg-blue-100"
+          >
+            <X className="h-5 w-5 text-gray-600" />
+          </Button>
+        </div>
+
+        {/* Cart Content */}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {cart.items.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center p-8">
+              <div className="text-center space-y-4">
+                <div className="relative">
+                  <ShoppingCart className="h-20 w-20 text-gray-300 mx-auto" />
+                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
+                    <span className="text-xs text-gray-500">0</span>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-gray-500 text-lg font-medium">Your cart is empty</p>
+                  <p className="text-gray-400 text-sm">Add some products to get started</p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsCartOpen(false)}
+                  className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                >
+                  Start Shopping
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Cart Items */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {cart.items.map((item, index) => (
+                  <div 
+                    key={item.id} 
+                    className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all duration-200 transform hover:scale-[1.02]"
+                    style={{
+                      animationDelay: `${index * 100}ms`,
+                      animation: 'slideInFromRight 0.3s ease-out forwards'
+                    }}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h3 className="font-medium text-gray-900 text-sm leading-tight">{item.name}</h3>
+                        {item.supplier && (
+                          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                            <Tag className="h-3 w-3" />
+                            {item.supplier}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFromCart(item.id)}
+                        className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 -mt-1 -mr-1"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg font-bold text-blue-600">{formatCurrency(item.unit_price)}</span>
+                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                          Stock: {item.current_stock}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateCartItemQuantity(item.id, item.quantity - 1)}
+                            className="h-7 w-7 p-0 border-gray-300 hover:border-blue-400 hover:bg-blue-50"
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="w-12 text-center font-medium text-gray-900">{item.quantity}</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateCartItemQuantity(item.id, item.quantity + 1)}
+                            className="h-7 w-7 p-0 border-gray-300 hover:border-blue-400 hover:bg-blue-50 disabled:opacity-50"
+                            disabled={item.quantity >= item.current_stock}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <span className="font-semibold text-gray-900">{formatCurrency(item.unit_price * item.quantity)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Cart Footer */}
+              <div className="border-t border-gray-200 p-6 bg-gray-50 space-y-4">
+                {/* Subtotal and Total */}
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Subtotal ({cart.itemCount} items):</span>
+                    <span>{formatCurrency(cart.total)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-lg font-bold border-t pt-2">
+                    <span className="text-gray-900">Total:</span>
+                    <span className="text-blue-600 text-xl">{formatCurrency(cart.total)}</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="space-y-3">
+                  <Button
+                    variant="outline"
+                    onClick={clearCart}
+                    className="w-full border-gray-300 text-gray-700 hover:bg-gray-100 hover:border-gray-400"
+                  >
+                    <X className="mr-2 h-4 w-4" />
+                    Clear Cart
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setIsCartOpen(false);
+                      setIsCheckoutOpen(true);
+                    }}
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
+                  >
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Proceed to Checkout
+                  </Button>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="pt-2 border-t border-gray-200">
+                  <p className="text-xs text-gray-500 text-center">
+                    Continue shopping to add more items
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Cart Overlay */}
+      {isCartOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity duration-300"
+          onClick={() => setIsCartOpen(false)}
+        />
+      )}
+
+      {/* Checkout Dialog */}
+      <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-green-600" />
+              Checkout
+            </DialogTitle>
+            <DialogDescription>
+              Complete your sale by providing customer information
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="customerName">Customer Name *</Label>
+              <Input
+                id="customerName"
+                value={checkoutData.customerName}
+                onChange={(e) => setCheckoutData({ ...checkoutData, customerName: e.target.value })}
+                placeholder="Enter customer name"
+                required
+              />
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="customerPhone">Phone Number</Label>
+              <Input
+                id="customerPhone"
+                value={checkoutData.customerPhone}
+                onChange={(e) => setCheckoutData({ ...checkoutData, customerPhone: e.target.value })}
+                placeholder="Enter phone number"
+              />
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="paymentMethod">Payment Method</Label>
+              <Select 
+                value={checkoutData.paymentMethod} 
+                onValueChange={(value) => setCheckoutData({ ...checkoutData, paymentMethod: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select payment method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="mobile_money">Mobile Money</SelectItem>
+                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="referenceNumber">Reference Number</Label>
+              <Input
+                id="referenceNumber"
+                value={checkoutData.referenceNumber}
+                onChange={(e) => setCheckoutData({ ...checkoutData, referenceNumber: e.target.value })}
+                placeholder="Invoice/Receipt number (optional)"
+              />
+            </div>
+            
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="font-medium mb-2">Order Summary</h4>
+              <div className="space-y-2 text-sm">
+                {cart.items.map((item) => (
+                  <div key={item.id} className="flex justify-between">
+                    <span>{item.name} x {item.quantity}</span>
+                    <span>{formatCurrency(item.unit_price * item.quantity)}</span>
+                  </div>
+                ))}
+                <div className="border-t pt-2 font-medium">
+                  <div className="flex justify-between">
+                    <span>Total:</span>
+                    <span className="text-blue-600">{formatCurrency(cart.total)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsCheckoutOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCheckout} className="bg-green-600 hover:bg-green-700">
+              Complete Sale
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

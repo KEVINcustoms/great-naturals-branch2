@@ -64,7 +64,7 @@ export function ReceiptDialog({ isOpen, onClose, service }: ReceiptDialogProps) 
           const { data: item } = await supabase
             .from("inventory_items")
             .select("name")
-            .eq("id", product.product_id)
+            .eq("id", product.inventory_item_id)
             .single();
           
           return {

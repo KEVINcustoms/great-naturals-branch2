@@ -104,3 +104,5 @@ ADD COLUMN commission_rate DECIMAL(5,2) DEFAULT NULL;
 - Audit trail of commission rate changes
 - Performance optimized with database indexes
 - Responsive UI for easy rate management
+
+

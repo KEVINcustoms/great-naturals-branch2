@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Edit, Trash2, Receipt, Calendar, Users, Scissors, DollarSign, Clock, UserCheck, TrendingUp } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Receipt, Calendar, Users, Scissors, DollarSign, Clock, UserCheck, TrendingUp, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { ReceiptDialog } from "@/components/services/ReceiptDialog";
+import { InventoryAvailabilityCheck } from "@/components/services/InventoryAvailabilityCheck";
 import { updateWorkerEarnings } from "@/utils/workerEarnings";
 import { formatCurrency } from "@/lib/utils";
 
@@ -61,9 +62,10 @@ interface InventoryItem {
 }
 
 interface ServiceProduct {
-  product_id: string;
+  inventory_item_id: string;
   quantity: number;
   price_per_unit: number;
+  total_price: number;
 }
 
 export default function Services() {
@@ -76,6 +78,8 @@ export default function Services() {
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [editingService, setEditingService] = useState<Service | null>(null);
+  const [isInventoryCheckOpen, setIsInventoryCheckOpen] = useState(false);
+  const [pendingServiceCompletion, setPendingServiceCompletion] = useState<Service | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isNewCustomer, setIsNewCustomer] = useState(false);
   
@@ -102,6 +106,93 @@ export default function Services() {
 
   useEffect(() => {
     fetchData();
+
+    // Set up real-time subscriptions for automatic updates
+    const servicesSubscription = supabase
+      .channel('services_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'services'
+        },
+        (payload) => {
+          console.log('Services table changed:', payload);
+          // Refresh services data when changes occur
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    const inventorySubscription = supabase
+      .channel('inventory_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'inventory_items'
+        },
+        (payload) => {
+          console.log('Inventory items table changed:', payload);
+          // Refresh inventory data when changes occur
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    const serviceProductsSubscription = supabase
+      .channel('service_products_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'service_products'
+        },
+        (payload) => {
+          console.log('Service products table changed:', payload);
+          // Refresh both services and inventory when service products change
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    const inventoryTransactionsSubscription = supabase
+      .channel('inventory_transactions_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'inventory_transactions'
+        },
+        (payload) => {
+          console.log('Inventory transactions table changed:', payload);
+          // Refresh inventory data when transactions occur
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    // Listen for custom events from other pages that indicate inventory data changes
+    const handleInventoryDataChanged = (event: CustomEvent) => {
+      console.log('Services page - inventory data change detected:', event.detail);
+      // Refresh services data when inventory changes
+      fetchData();
+    };
+
+    window.addEventListener('inventory-data-changed', handleInventoryDataChanged as EventListener);
+
+    // Cleanup subscriptions and event listeners on unmount
+    return () => {
+      servicesSubscription.unsubscribe();
+      inventorySubscription.unsubscribe();
+      serviceProductsSubscription.unsubscribe();
+      inventoryTransactionsSubscription.unsubscribe();
+      window.removeEventListener('inventory-data-changed', handleInventoryDataChanged as EventListener);
+    };
   }, []);
 
   const fetchData = async () => {
@@ -162,14 +253,14 @@ export default function Services() {
     console.log('Form submission - Service products:', serviceProducts);
     console.log('Form submission - Form data:', formData);
 
-    // Validate service products - only validate products that have a product_id selected
-    const productsToValidate = serviceProducts.filter(sp => sp.product_id);
+    // Validate service products - only validate products that have a inventory_item_id selected
+    const productsToValidate = serviceProducts.filter(sp => sp.inventory_item_id);
     const invalidProducts = productsToValidate.filter(sp => 
       sp.quantity <= 0 || sp.price_per_unit <= 0
     );
     
-    // Check if there are products with no product_id selected
-    const productsWithoutSelection = serviceProducts.filter(sp => !sp.product_id);
+    // Check if there are products with no inventory_item_id selected
+    const productsWithoutSelection = serviceProducts.filter(sp => !sp.inventory_item_id);
     if (productsWithoutSelection.length > 0) {
       toast({
         title: "Product Selection Error",
@@ -184,9 +275,8 @@ export default function Services() {
       console.log('All service products:', serviceProducts);
       
       const errorDetails = invalidProducts.map((sp, index) => {
-        if (!sp.product_id) return `Product ${index + 1}: No product selected`;
+        if (!sp.inventory_item_id) return `Product ${index + 1}: No product selected`;
         if (sp.quantity <= 0) return `Product ${index + 1}: Invalid quantity (${sp.quantity})`;
-        if (sp.price_per_unit <= 0) return `Product ${index + 1}: Invalid price (${sp.price_per_unit})`;
         return `Product ${index + 1}: Unknown error`;
       }).join(', ');
       
@@ -278,10 +368,10 @@ export default function Services() {
           // Then insert new service products
           const serviceProductsData = serviceProducts.map(sp => ({
             service_id: editingService.id,
-            product_id: sp.product_id,
+            inventory_item_id: sp.inventory_item_id,
             quantity: sp.quantity,
             price_per_unit: sp.price_per_unit,
-            total_price: sp.quantity * sp.price_per_unit,
+            total_price: sp.total_price || sp.quantity * sp.price_per_unit,
           }));
 
           const { error: productsError } = await supabase
@@ -313,10 +403,10 @@ export default function Services() {
         if (serviceProducts.length > 0) {
           const serviceProductsData = serviceProducts.map(sp => ({
             service_id: newService.id,
-            product_id: sp.product_id,
+            inventory_item_id: sp.inventory_item_id,
             quantity: sp.quantity,
             price_per_unit: sp.price_per_unit,
-            total_price: sp.quantity * sp.price_per_unit,
+            total_price: sp.total_price || sp.quantity * sp.price_per_unit,
           }));
 
           const { error: productsError } = await supabase
@@ -365,7 +455,23 @@ export default function Services() {
         commission_rate: "",
       });
       setServiceProducts([]);
-      fetchData();
+      
+      // Refresh services data
+      await fetchData();
+      
+      // Trigger a custom event to notify other components that inventory-related data has changed
+      window.dispatchEvent(new CustomEvent('inventory-data-changed', {
+        detail: {
+          type: 'service_updated',
+          serviceId: editingService?.id || 'new',
+          hasInventoryProducts: serviceProducts.length > 0
+        }
+      }));
+      
+      // Additional refresh to ensure all data is current
+      setTimeout(() => {
+        fetchData();
+      }, 500);
     } catch (error) {
       console.error("Error saving service:", error);
       toast({
@@ -441,7 +547,7 @@ export default function Services() {
           .from("service_products")
           .select(`
             *,
-            products (name, unit_price)
+            inventory_items (name, unit_price)
           `)
           .eq("service_id", service.id);
 
@@ -449,9 +555,10 @@ export default function Services() {
         
         // Transform the data to match our ServiceProduct interface
         const transformedProducts = (existingProducts || []).map(sp => ({
-          product_id: sp.product_id,
+          inventory_item_id: sp.inventory_item_id,
           quantity: sp.quantity,
           price_per_unit: sp.price_per_unit,
+          total_price: sp.total_price || 0,
         }));
         
         setServiceProducts(transformedProducts);
@@ -485,8 +592,172 @@ export default function Services() {
     setIsReceiptOpen(true);
   };
 
+  const handleServiceCompletion = async (service: Service) => {
+    try {
+      // First, check if this specific service has inventory items
+      const { data: serviceProductsData, error: fetchError } = await supabase
+        .from('service_products')
+        .select('*')
+        .eq('service_id', service.id);
+
+      if (fetchError) {
+        console.error('Error fetching service products:', fetchError);
+        toast({
+          title: "❌ Error",
+          description: "Failed to check service inventory. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check if service has inventory items
+      if (serviceProductsData && serviceProductsData.length > 0) {
+        // Open inventory availability check
+        setPendingServiceCompletion(service);
+        setIsInventoryCheckOpen(true);
+      } else {
+        // No inventory items, complete service directly
+        await completeService(service);
+      }
+    } catch (error) {
+      console.error('Error in handleServiceCompletion:', error);
+      toast({
+        title: "❌ Error",
+        description: "Failed to process service completion. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const completeService = async (service: Service) => {
+    try {
+      // Show loading state
+      toast({
+        title: "Processing...",
+        description: "Completing service and updating inventory...",
+      });
+
+      console.log('Attempting to complete service:', service.id);
+
+      // First, verify the service exists and get current status
+      const { data: currentService, error: fetchError } = await supabase
+        .from("services")
+        .select("status, created_by")
+        .eq("id", service.id)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching current service:', fetchError);
+        throw new Error('Service not found or access denied');
+      }
+
+      if (currentService.status === 'completed') {
+        toast({
+          title: "⚠️ Already Completed",
+          description: "This service is already completed.",
+          variant: "default",
+        });
+        return;
+      }
+
+      console.log('Current service status:', currentService.status);
+
+      // Update service status to completed
+      const { error: updateError } = await supabase
+        .from("services")
+        .update({ status: "completed" })
+        .eq("id", service.id);
+
+      if (updateError) {
+        console.error('Error updating service status:', updateError);
+        throw updateError;
+      }
+
+      console.log('Service status updated successfully');
+
+      // Update worker earnings if staff member is assigned
+      if (service.staff_member_id) {
+        try {
+          await updateWorkerEarnings(service.staff_member_id, service.service_price, service.commission_rate);
+          console.log('Worker earnings updated');
+        } catch (earningsError) {
+          console.warn('Warning: Failed to update worker earnings:', earningsError);
+          // Don't fail the service completion for earnings update failure
+        }
+      }
+
+      // Success message with details
+      toast({
+        title: "✅ Service Completed Successfully",
+        description: `"${service.service_name}" has been completed and inventory has been updated.`,
+        className: "bg-green-50 border-green-200 text-green-800",
+      });
+
+      console.log('Service completed successfully');
+
+      // Refresh ALL data to show updated inventory levels
+      await fetchData(); // This will refresh both services and inventory items
+
+      // Additional refresh to ensure all data is up to date
+      setTimeout(() => {
+        fetchData();
+      }, 1000);
+
+    } catch (error) {
+      console.error("Error completing service:", error);
+      
+      // Professional error handling with specific messages
+      let errorMessage = "Failed to complete service";
+      const errorTitle = "❌ Service Completion Failed";
+      
+      if (error && typeof error === 'object' && 'message' in error) {
+        const errorObj = error as { message: string };
+        console.log('Error message:', errorObj.message);
+        
+        if (errorObj.message.includes("inventory issues")) {
+          errorMessage = "Inventory check failed. Please verify stock levels and try again.";
+        } else if (errorObj.message.includes("stock levels")) {
+          errorMessage = "Insufficient inventory stock. Please restock items before completing.";
+        } else if (errorObj.message.includes("Failed to deduct")) {
+          errorMessage = "Inventory deduction failed. Please check stock availability.";
+        } else if (errorObj.message.includes("Service not found")) {
+          errorMessage = "Service not found or access denied. Please refresh and try again.";
+        } else if (errorObj.message.includes("access denied")) {
+          errorMessage = "Access denied. Please check your permissions.";
+        } else {
+          errorMessage = `Error: ${errorObj.message}`;
+        }
+      }
+      
+      toast({
+        title: errorTitle,
+        description: errorMessage,
+        variant: "destructive",
+        className: "bg-red-50 border-red-200 text-red-800",
+      });
+    }
+  };
+
+  const onInventoryAvailabilityConfirmed = async () => {
+    if (pendingServiceCompletion) {
+      console.log('Inventory availability confirmed, completing service:', pendingServiceCompletion.id);
+      try {
+        await completeService(pendingServiceCompletion);
+        setIsInventoryCheckOpen(false);
+        setPendingServiceCompletion(null);
+      } catch (error) {
+        console.error('Error in onInventoryAvailabilityConfirmed:', error);
+        toast({
+          title: "❌ Error",
+          description: "Failed to complete service after inventory confirmation.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   const addServiceProduct = () => {
-    const newProduct = { product_id: "", quantity: 1, price_per_unit: 0 };
+    const newProduct = { inventory_item_id: "", quantity: 1, price_per_unit: 0, total_price: 0 };
     console.log('Adding new service product:', newProduct);
     setServiceProducts([...serviceProducts, newProduct]);
   };
@@ -496,6 +767,12 @@ export default function Services() {
   const updateServiceProduct = (index: number, field: keyof ServiceProduct, value: string | number) => {
     const updated = [...serviceProducts];
     updated[index] = { ...updated[index], [field]: value };
+    
+    // Auto-calculate total_price when quantity or price_per_unit changes
+    if (field === 'quantity' || field === 'price_per_unit') {
+      updated[index].total_price = updated[index].quantity * updated[index].price_per_unit;
+    }
+    
     setServiceProducts(updated);
   };
 
@@ -511,16 +788,40 @@ export default function Services() {
     service.service_category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, service: Service) => {
     switch (status) {
       case 'completed':
         return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200">✓ Completed</Badge>;
       case 'pending':
-        return <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200">⏳ Pending</Badge>;
+        return (
+          <div className="flex items-center gap-2">
+            <Badge className="bg-amber-100 text-amber-800 border-amber-200">⏳ Pending</Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleServiceCompletion(service)}
+              className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 text-xs px-2 py-1 h-6"
+            >
+              ✓ Complete
+            </Button>
+          </div>
+        );
       case 'cancelled':
         return <Badge className="bg-red-100 text-red-800 border-red-200 hover:bg-red-200">✗ Cancelled</Badge>;
       case 'in_progress':
-        return <Badge className="bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200">🔄 In Progress</Badge>;
+        return (
+          <div className="flex items-center gap-2">
+            <Badge className="bg-amber-100 text-amber-800 border-amber-200">🔄 In Progress</Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleServiceCompletion(service)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2 py-1 h-6"
+            >
+              ✓ Complete
+            </Button>
+          </div>
+        );
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -561,13 +862,29 @@ export default function Services() {
           </h1>
           <p className="text-muted-foreground">Manage salon services and appointments</p>
         </div>
-        <Button 
-          onClick={() => openDialog()}
-          className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          New Service
-        </Button>
+        <div className="flex gap-3">
+          <Button 
+            onClick={() => {
+              fetchData();
+              toast({
+                title: "🔄 Refreshed",
+                description: "Data refreshed successfully",
+              });
+            }}
+            variant="outline"
+            className="border-blue-200 text-blue-700 hover:bg-blue-50"
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
+          <Button 
+            onClick={() => openDialog()}
+            className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            New Service
+          </Button>
+        </div>
       </div>
 
       <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-blue-50/50">
@@ -631,7 +948,7 @@ export default function Services() {
                         <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
-                    <TableCell>{getStatusBadge(service.status)}</TableCell>
+                    <TableCell>{getStatusBadge(service.status, service)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-blue-500" />
@@ -996,11 +1313,11 @@ export default function Services() {
                     </div>
                                          {serviceProducts.map((product, index) => (
                        <div key={index} className={`grid grid-cols-12 gap-3 p-3 rounded-lg border ${
-                         !product.product_id ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'
+                         !product.inventory_item_id ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'
                        }`}>
                         <div className="col-span-4">
                           <Select
-                            value={product.product_id}
+                            value={product.inventory_item_id}
                                                          onValueChange={(value) => {
                                console.log('Inventory item selected:', value);
                                const selectedItem = inventoryItems.find(item => item.id === value);
@@ -1009,17 +1326,18 @@ export default function Services() {
                                if (selectedItem) {
                                  console.log('Setting price:', selectedItem.unit_price);
                                  
-                                 // Update both product_id and price_per_unit atomically
+                                 // Update both inventory_item_id and price_per_unit atomically
                                  const updated = [...serviceProducts];
                                  updated[index] = {
                                    ...updated[index],
-                                   product_id: value,
-                                   price_per_unit: selectedItem.unit_price
+                                   inventory_item_id: value,
+                                   price_per_unit: selectedItem.unit_price,
+                                   total_price: selectedItem.unit_price * updated[index].quantity
                                  };
                                  setServiceProducts(updated);
                                } else {
-                                 // Just update the product_id if no item found
-                                 updateServiceProduct(index, 'product_id', value);
+                                 // Just update the inventory_item_id if no item found
+                                 updateServiceProduct(index, 'inventory_item_id', value);
                                }
                              }}
                           >
@@ -1130,6 +1448,22 @@ export default function Services() {
         onClose={() => setIsReceiptOpen(false)}
         service={selectedService}
       />
+
+      {/* Inventory Availability Check Dialog */}
+      <Dialog open={isInventoryCheckOpen} onOpenChange={setIsInventoryCheckOpen}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+          {pendingServiceCompletion && (
+            <InventoryAvailabilityCheck
+              serviceId={pendingServiceCompletion.id}
+              onAvailabilityConfirmed={onInventoryAvailabilityConfirmed}
+              onCancel={() => {
+                setIsInventoryCheckOpen(false);
+                setPendingServiceCompletion(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

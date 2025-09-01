@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { CustomerProductHistory } from "@/components/services/CustomerProductHistory";
 import { formatCurrency } from "@/lib/utils";
 
 interface Customer {
@@ -293,7 +294,7 @@ export default function Customers() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-gray-100 p-1">
+        <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1">
           <TabsTrigger 
             value="customers" 
             className="data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm"
@@ -306,6 +307,18 @@ export default function Customers() {
             className="data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm disabled:opacity-50"
           >
             Service History
+            {selectedCustomer && (
+              <span className="ml-2 text-xs text-purple-500 font-medium">
+                ({selectedCustomer.name})
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger 
+            value="products" 
+            disabled={!selectedCustomer}
+            className="data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm disabled:opacity-50"
+          >
+            Product History
             {selectedCustomer && (
               <span className="ml-2 text-xs text-purple-500 font-medium">
                 ({selectedCustomer.name})
@@ -583,6 +596,15 @@ export default function Customers() {
                 </CardContent>
               </Card>
             </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="products" className="mt-6">
+          {selectedCustomer && (
+            <CustomerProductHistory
+              customerId={selectedCustomer.id}
+              customerName={selectedCustomer.name}
+            />
           )}
         </TabsContent>
       </Tabs>
