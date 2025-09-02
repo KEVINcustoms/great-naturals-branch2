@@ -14,6 +14,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { InventoryReceiptDialog } from "@/components/inventory/InventoryReceiptDialog";
 import { formatCurrency } from "@/lib/utils";
+import { inventoryItemValidation, InventoryItemFormData } from "@/utils/validation";
+import { secureFormSubmit, secureInput } from "@/utils/security";
 
 interface InventoryItem {
   id: string;
@@ -154,12 +156,12 @@ export default function Inventory() {
     referenceNumber: "",
   });
   
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<InventoryItemFormData>({
     name: "",
-    current_stock: "",
-    min_stock_level: "",
-    max_stock_level: "",
-    unit_price: "",
+    current_stock: "0",
+    min_stock_level: "0",
+    max_stock_level: "0",
+    unit_price: "0",
     expiry_date: "",
     supplier: "",
     barcode: "",
@@ -179,6 +181,30 @@ export default function Inventory() {
   
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Secure input handler with sanitization
+  const handleInputChange = (field: keyof InventoryItemFormData, value: string | number) => {
+    let sanitizedValue = value;
+    
+    if (typeof value === 'string') {
+      switch (field) {
+        case 'name':
+        case 'supplier':
+        case 'barcode':
+          sanitizedValue = secureInput.string(value);
+          break;
+        case 'expiry_date':
+          sanitizedValue = value; // Date format validation handled by Zod
+          break;
+        default:
+          sanitizedValue = secureInput.string(value);
+      }
+    } else if (typeof value === 'number') {
+      sanitizedValue = secureInput.number(value);
+    }
+    
+    setFormData(prev => ({ ...prev, [field]: sanitizedValue }));
+  };
 
   useEffect(() => {
     fetchData();
@@ -342,10 +368,10 @@ export default function Inventory() {
     try {
       const itemData = {
         name: formData.name,
-        current_stock: parseInt(formData.current_stock) || 0,
-        min_stock_level: parseInt(formData.min_stock_level) || 0,
-        max_stock_level: parseInt(formData.max_stock_level) || 100,
-        unit_price: parseFloat(formData.unit_price) || 0,
+        current_stock: parseInt(formData.current_stock.toString()) || 0,
+        min_stock_level: parseInt(formData.min_stock_level.toString()) || 0,
+        max_stock_level: parseInt(formData.max_stock_level.toString()) || 100,
+        unit_price: parseFloat(formData.unit_price.toString()) || 0,
         expiry_date: formData.expiry_date || null,
         supplier: formData.supplier || null,
         barcode: formData.barcode || null,
@@ -373,10 +399,10 @@ export default function Inventory() {
       setEditingItem(null);
       setFormData({
         name: "",
-        current_stock: "",
-        min_stock_level: "",
-        max_stock_level: "",
-        unit_price: "",
+        current_stock: "0",
+        min_stock_level: "0",
+        max_stock_level: "0",
+        unit_price: "0",
         expiry_date: "",
         supplier: "",
         barcode: "",
@@ -522,7 +548,7 @@ export default function Inventory() {
         current_stock: "0",
         min_stock_level: "10",
         max_stock_level: "100",
-        unit_price: "",
+        unit_price: "0",
         expiry_date: "",
         supplier: "",
         barcode: "",
@@ -1337,7 +1363,7 @@ export default function Inventory() {
                 <Input
                   id="name"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
                   required
                 />
               </div>
@@ -1348,7 +1374,7 @@ export default function Inventory() {
                     id="current_stock"
                     type="number"
                     value={formData.current_stock}
-                    onChange={(e) => setFormData({ ...formData, current_stock: e.target.value })}
+                    onChange={(e) => handleInputChange('current_stock', parseInt(e.target.value) || 0)}
                   />
                 </div>
                 <div>
@@ -1357,7 +1383,7 @@ export default function Inventory() {
                     id="min_stock_level"
                     type="number"
                     value={formData.min_stock_level}
-                    onChange={(e) => setFormData({ ...formData, min_stock_level: e.target.value })}
+                    onChange={(e) => handleInputChange('min_stock_level', parseInt(e.target.value) || 0)}
                   />
                 </div>
                 <div>
@@ -1366,7 +1392,7 @@ export default function Inventory() {
                     id="max_stock_level"
                     type="number"
                     value={formData.max_stock_level}
-                    onChange={(e) => setFormData({ ...formData, max_stock_level: e.target.value })}
+                    onChange={(e) => handleInputChange('max_stock_level', parseInt(e.target.value) || 0)}
                   />
                 </div>
               </div>
@@ -1377,7 +1403,7 @@ export default function Inventory() {
                   type="number"
                   step="0.01"
                   value={formData.unit_price}
-                  onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })}
+                  onChange={(e) => handleInputChange('unit_price', parseFloat(e.target.value) || 0)}
                   required
                 />
               </div>
@@ -1386,7 +1412,7 @@ export default function Inventory() {
                 <Input
                   id="supplier"
                   value={formData.supplier}
-                  onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
+                  onChange={(e) => handleInputChange('supplier', e.target.value)}
                 />
               </div>
               <div className="grid gap-2">
@@ -1395,7 +1421,7 @@ export default function Inventory() {
                   id="expiry_date"
                   type="date"
                   value={formData.expiry_date}
-                  onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })}
+                  onChange={(e) => handleInputChange('expiry_date', e.target.value)}
                 />
               </div>
               <div className="grid gap-2">
@@ -1403,7 +1429,7 @@ export default function Inventory() {
                 <Input
                   id="barcode"
                   value={formData.barcode}
-                  onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                  onChange={(e) => handleInputChange('barcode', e.target.value)}
                 />
               </div>
             </div>
@@ -1499,28 +1525,42 @@ export default function Inventory() {
       />
 
       {/* Shopping Cart Sidebar */}
-      <div className={`fixed inset-y-0 right-0 w-96 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-50 ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed inset-y-0 right-0 w-96 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-50 flex flex-col ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         {/* Cart Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-cyan-50">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-cyan-50 flex-shrink-0">
           <div className="flex items-center gap-3">
             <ShoppingCart className="h-6 w-6 text-blue-600" />
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Shopping Cart</h2>
-              <p className="text-sm text-gray-600">{cart.itemCount} items</p>
+              <h2 className="text-lg font-bold text-gray-900">Shopping Cart</h2>
+              <p className="text-sm text-gray-600">
+                {cart.itemCount} items • {formatCurrency(cart.total)}
+              </p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsCartOpen(false)}
-            className="h-8 w-8 p-0 hover:bg-blue-100"
-          >
-            <X className="h-5 w-5 text-gray-600" />
-          </Button>
+          <div className="flex items-center gap-2">
+            {cart.items.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearCart}
+                className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50 text-xs"
+              >
+                Clear All
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsCartOpen(false)}
+              className="h-8 w-8 p-0 hover:bg-blue-100"
+            >
+              <X className="h-5 w-5 text-gray-600" />
+            </Button>
+          </div>
         </div>
 
         {/* Cart Content */}
-        <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0">
           {cart.items.length === 0 ? (
             <div className="flex-1 flex items-center justify-center p-8">
               <div className="text-center space-y-4">
@@ -1546,23 +1586,28 @@ export default function Inventory() {
           ) : (
             <>
               {/* Cart Items */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                {cart.items.length > 5 && (
+                  <div className="text-xs text-gray-500 text-center py-2 bg-blue-50 rounded-lg mb-2">
+                    Scroll to see all {cart.items.length} items
+                  </div>
+                )}
                 {cart.items.map((item, index) => (
                   <div 
                     key={item.id} 
-                    className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all duration-200 transform hover:scale-[1.02]"
+                    className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md transition-all duration-200 flex-shrink-0"
                     style={{
-                      animationDelay: `${index * 100}ms`,
+                      animationDelay: `${index * 50}ms`,
                       animation: 'slideInFromRight 0.3s ease-out forwards'
                     }}
                   >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <h3 className="font-medium text-gray-900 text-sm leading-tight">{item.name}</h3>
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-gray-900 text-sm leading-tight truncate">{item.name}</h3>
                         {item.supplier && (
-                          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                            <Tag className="h-3 w-3" />
-                            {item.supplier}
+                          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1 truncate">
+                            <Tag className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">{item.supplier}</span>
                           </p>
                         )}
                       </div>
@@ -1570,42 +1615,42 @@ export default function Inventory() {
                         variant="ghost"
                         size="sm"
                         onClick={() => removeFromCart(item.id)}
-                        className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 -mt-1 -mr-1"
+                        className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 -mt-1 -mr-1 flex-shrink-0"
                       >
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
                     
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-lg font-bold text-blue-600">{formatCurrency(item.unit_price)}</span>
-                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                        <span className="text-base font-bold text-blue-600">{formatCurrency(item.unit_price)}</span>
+                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded flex-shrink-0">
                           Stock: {item.current_stock}
                         </span>
                       </div>
                       
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => updateCartItemQuantity(item.id, item.quantity - 1)}
-                            className="h-7 w-7 p-0 border-gray-300 hover:border-blue-400 hover:bg-blue-50"
+                            className="h-6 w-6 p-0 border-gray-300 hover:border-blue-400 hover:bg-blue-50"
                           >
                             <Minus className="h-3 w-3" />
                           </Button>
-                          <span className="w-12 text-center font-medium text-gray-900">{item.quantity}</span>
+                          <span className="w-8 text-center font-medium text-gray-900 text-sm">{item.quantity}</span>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => updateCartItemQuantity(item.id, item.quantity + 1)}
-                            className="h-7 w-7 p-0 border-gray-300 hover:border-blue-400 hover:bg-blue-50 disabled:opacity-50"
+                            className="h-6 w-6 p-0 border-gray-300 hover:border-blue-400 hover:bg-blue-50 disabled:opacity-50"
                             disabled={item.quantity >= item.current_stock}
                           >
                             <Plus className="h-3 w-3" />
                           </Button>
                         </div>
-                        <span className="font-semibold text-gray-900">{formatCurrency(item.unit_price * item.quantity)}</span>
+                        <span className="font-semibold text-gray-900 text-sm">{formatCurrency(item.unit_price * item.quantity)}</span>
                       </div>
                     </div>
                   </div>
@@ -1613,7 +1658,7 @@ export default function Inventory() {
               </div>
 
               {/* Cart Footer */}
-              <div className="border-t border-gray-200 p-6 bg-gray-50 space-y-4">
+              <div className="border-t border-gray-200 p-4 bg-gray-50 space-y-3 flex-shrink-0">
                 {/* Subtotal and Total */}
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm text-gray-600">
@@ -1628,14 +1673,6 @@ export default function Inventory() {
 
                 {/* Action Buttons */}
                 <div className="space-y-3">
-                  <Button
-                    variant="outline"
-                    onClick={clearCart}
-                    className="w-full border-gray-300 text-gray-700 hover:bg-gray-100 hover:border-gray-400"
-                  >
-                    <X className="mr-2 h-4 w-4" />
-                    Clear Cart
-                  </Button>
                   <Button
                     onClick={() => {
                       setIsCartOpen(false);

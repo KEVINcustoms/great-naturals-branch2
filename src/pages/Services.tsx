@@ -16,6 +16,8 @@ import { ReceiptDialog } from "@/components/services/ReceiptDialog";
 import { InventoryAvailabilityCheck } from "@/components/services/InventoryAvailabilityCheck";
 import { updateWorkerEarnings } from "@/utils/workerEarnings";
 import { formatCurrency } from "@/lib/utils";
+import { extendedServiceValidation, ExtendedServiceFormData } from "@/utils/validation";
+import { secureFormSubmit, secureInput } from "@/utils/security";
 
 interface Service {
   id: string;
@@ -83,19 +85,19 @@ export default function Services() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isNewCustomer, setIsNewCustomer] = useState(false);
   
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ExtendedServiceFormData>({
     customer_id: "",
     customer_name: "",
     customer_email: "",
     customer_phone: "",
     service_name: "",
     service_category: "",
-    service_price: "",
+    service_price: 0,
     staff_member_id: "",
     status: "pending",
     date_time: new Date().toISOString().slice(0, 16),
     notes: "",
-    commission_rate: "",
+    commission_rate: 0,
   });
 
   const [serviceProducts, setServiceProducts] = useState<ServiceProduct[]>([]);
@@ -103,6 +105,37 @@ export default function Services() {
   
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Secure input handler with sanitization
+  const handleInputChange = (field: keyof ExtendedServiceFormData, value: string | number) => {
+    let sanitizedValue = value;
+    
+    if (typeof value === 'string') {
+      switch (field) {
+        case 'customer_name':
+        case 'service_name':
+        case 'service_category':
+          sanitizedValue = secureInput.string(value);
+          break;
+        case 'customer_email':
+          sanitizedValue = secureInput.email(value);
+          break;
+        case 'customer_phone':
+          sanitizedValue = secureInput.phone(value);
+          break;
+        case 'date_time':
+        case 'notes':
+          sanitizedValue = value; // These are handled by specific validation
+          break;
+        default:
+          sanitizedValue = secureInput.string(value);
+      }
+    } else if (typeof value === 'number') {
+      sanitizedValue = secureInput.number(value);
+    }
+    
+    setFormData(prev => ({ ...prev, [field]: sanitizedValue }));
+  };
 
   useEffect(() => {
     fetchData();
@@ -1141,7 +1174,7 @@ export default function Services() {
                     <Input
                       id="customer_name"
                       value={formData.customer_name}
-                      onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
+                      onChange={(e) => handleInputChange('customer_name', e.target.value)}
                       required
                       className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
                     />
@@ -1152,7 +1185,7 @@ export default function Services() {
                       id="customer_email"
                       type="email"
                       value={formData.customer_email}
-                      onChange={(e) => setFormData({ ...formData, customer_email: e.target.value })}
+                      onChange={(e) => handleInputChange('customer_email', e.target.value)}
                       className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
                     />
                   </div>
@@ -1161,7 +1194,7 @@ export default function Services() {
                     <Input
                       id="customer_phone"
                       value={formData.customer_phone}
-                      onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
+                      onChange={(e) => handleInputChange('customer_phone', e.target.value)}
                       className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
                     />
                   </div>
@@ -1174,7 +1207,7 @@ export default function Services() {
                 <Input
                   id="service_name"
                   value={formData.service_name}
-                  onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
+                  onChange={(e) => handleInputChange('service_name', e.target.value)}
                   required
                   className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
                 />
@@ -1184,7 +1217,7 @@ export default function Services() {
                 <Input
                   id="service_category"
                   value={formData.service_category}
-                  onChange={(e) => setFormData({ ...formData, service_category: e.target.value })}
+                  onChange={(e) => handleInputChange('service_category', e.target.value)}
                   required
                   placeholder="e.g., Haircut, Coloring, Styling"
                   className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
@@ -1200,7 +1233,7 @@ export default function Services() {
                   type="number"
                   step="0.01"
                   value={formData.service_price}
-                  onChange={(e) => setFormData({ ...formData, service_price: e.target.value })}
+                  onChange={(e) => handleInputChange('service_price', parseFloat(e.target.value) || 0)}
                   required
                   className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
                 />
@@ -1214,7 +1247,7 @@ export default function Services() {
                     min="0"
                     max="100"
                     value={formData.commission_rate}
-                    onChange={(e) => setFormData({ ...formData, commission_rate: e.target.value })}
+                    onChange={(e) => handleInputChange('commission_rate', parseFloat(e.target.value) || 0)}
                     placeholder="Leave empty for worker default"
                     className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
                   />
@@ -1270,7 +1303,7 @@ export default function Services() {
                   id="date_time"
                   type="datetime-local"
                   value={formData.date_time}
-                  onChange={(e) => setFormData({ ...formData, date_time: e.target.value })}
+                  onChange={(e) => handleInputChange('date_time', e.target.value)}
                   required
                   className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"
                 />
@@ -1415,7 +1448,7 @@ export default function Services() {
                 <Textarea
                   id="notes"
                   value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  onChange={(e) => handleInputChange('notes', e.target.value)}
                   placeholder="Additional notes about the service..."
                   rows={3}
                   className="border-gray-200 focus:border-blue-400 focus:ring-blue-400"

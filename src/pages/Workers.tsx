@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency } from "@/lib/utils";
+import { workerValidation, WorkerFormData } from "@/utils/validation";
+import { secureFormSubmit, secureInput } from "@/utils/security";
 
 interface Worker {
   id: string;
@@ -34,13 +36,13 @@ export default function Workers() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<WorkerFormData>({
     name: "",
     email: "",
     phone: "",
     role: "",
-    salary: "",
-    payment_type: 'monthly' as 'monthly' | 'commission',
+    salary: 0,
+    payment_type: 'monthly',
     commission_rate: 6,
     payment_status: "pending",
     hire_date: "",
@@ -74,58 +76,96 @@ export default function Workers() {
     }
   };
 
+  // Secure input handler with sanitization
+  const handleInputChange = (field: keyof WorkerFormData, value: string | number) => {
+    let sanitizedValue = value;
+    
+    if (typeof value === 'string') {
+      switch (field) {
+        case 'name':
+        case 'role':
+          sanitizedValue = secureInput.string(value);
+          break;
+        case 'email':
+          sanitizedValue = secureInput.email(value);
+          break;
+        case 'phone':
+          sanitizedValue = secureInput.phone(value);
+          break;
+        case 'hire_date':
+          sanitizedValue = value; // Date format validation handled by Zod
+          break;
+        default:
+          sanitizedValue = secureInput.string(value);
+      }
+    } else if (typeof value === 'number') {
+      sanitizedValue = secureInput.number(value);
+    }
+    
+    setFormData(prev => ({ ...prev, [field]: sanitizedValue }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
     try {
-      if (editingWorker) {
-        const { error } = await supabase
-          .from("workers")
-          .update({
-            name: formData.name,
-            email: formData.email || null,
-            phone: formData.phone || null,
-            role: formData.role,
-            salary: parseFloat(formData.salary) || 0,
-            payment_type: formData.payment_type,
-            commission_rate: parseFloat(formData.commission_rate.toString()) || 0,
-            payment_status: formData.payment_status,
-            hire_date: formData.hire_date,
-          })
-          .eq("id", editingWorker.id);
+      // Use secure form submission wrapper
+      await secureFormSubmit(
+        workerValidation,
+        formData,
+        async (validatedData) => {
+          if (editingWorker) {
+            const { error } = await supabase
+              .from("workers")
+              .update({
+                name: validatedData.name,
+                email: validatedData.email || null,
+                phone: validatedData.phone || null,
+                role: validatedData.role,
+                salary: validatedData.salary || 0,
+                payment_type: validatedData.payment_type,
+                commission_rate: validatedData.commission_rate || 0,
+                payment_status: validatedData.payment_status,
+                hire_date: validatedData.hire_date,
+              })
+              .eq("id", editingWorker.id);
 
-        if (error) throw error;
-        toast({ title: "Success", description: "Worker updated successfully" });
-      } else {
-        const { error } = await supabase
-          .from("workers")
-          .insert({
-            name: formData.name,
-            email: formData.email || null,
-            phone: formData.phone || null,
-            role: formData.role,
-            salary: parseFloat(formData.salary) || 0,
-            payment_type: formData.payment_type,
-            commission_rate: parseFloat(formData.commission_rate.toString()) || 0,
-            payment_status: formData.payment_status,
-            hire_date: formData.hire_date,
-            created_by: user.id,
-          });
+            if (error) throw error;
+            return { success: true, message: "Worker updated successfully" };
+          } else {
+            const { error } = await supabase
+              .from("workers")
+              .insert({
+                name: validatedData.name,
+                email: validatedData.email || null,
+                phone: validatedData.phone || null,
+                role: validatedData.role,
+                salary: validatedData.salary || 0,
+                payment_type: validatedData.payment_type,
+                commission_rate: validatedData.commission_rate || 0,
+                payment_status: validatedData.payment_status,
+                hire_date: validatedData.hire_date,
+                created_by: user.id,
+              });
 
-        if (error) throw error;
-        toast({ title: "Success", description: "Worker created successfully" });
-      }
+            if (error) throw error;
+            return { success: true, message: "Worker created successfully" };
+          }
+        },
+        user.id
+      );
 
+      toast({ title: "Success", description: editingWorker ? "Worker updated successfully" : "Worker created successfully" });
       setIsDialogOpen(false);
       setEditingWorker(null);
-      setFormData({ name: "", email: "", phone: "", role: "", salary: "", payment_status: "pending", hire_date: "", payment_type: 'monthly', commission_rate: 6 });
+      setFormData({ name: "", email: "", phone: "", role: "", salary: 0, payment_status: "pending", hire_date: "", payment_type: 'monthly', commission_rate: 6 });
       fetchWorkers();
     } catch (error) {
       console.error("Error saving worker:", error);
       toast({
         title: "Error",
-        description: "Failed to save worker",
+        description: error.message || "Failed to save worker",
         variant: "destructive",
       });
     }
@@ -467,7 +507,7 @@ export default function Workers() {
                   <Input
                     id="name"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) => handleInputChange('name', e.target.value)}
                     required
                   />
                 </div>
@@ -476,7 +516,7 @@ export default function Workers() {
                   <Input
                     id="role"
                     value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                    onChange={(e) => handleInputChange('role', e.target.value)}
                     placeholder="e.g., Hair Stylist, Receptionist"
                     required
                   />
@@ -491,7 +531,7 @@ export default function Workers() {
                     id="email"
                     type="email"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -499,7 +539,7 @@ export default function Workers() {
                   <Input
                     id="phone"
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    onChange={(e) => handleInputChange('phone', e.target.value)}
                   />
                 </div>
               </div>
@@ -529,7 +569,7 @@ export default function Workers() {
                     id="salary"
                     type="number"
                     value={formData.salary}
-                    onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
+                    onChange={(e) => handleInputChange('salary', parseFloat(e.target.value) || 0)}
                     placeholder="0"
                     required
                   />
@@ -541,7 +581,7 @@ export default function Workers() {
                       id="commission_rate"
                       type="number"
                       value={formData.commission_rate}
-                      onChange={(e) => setFormData({ ...formData, commission_rate: e.target.value })}
+                      onChange={(e) => handleInputChange('commission_rate', parseFloat(e.target.value) || 0)}
                       placeholder="6"
                       min="0"
                       max="100"
@@ -575,7 +615,7 @@ export default function Workers() {
                     id="hire_date"
                     type="date"
                     value={formData.hire_date}
-                    onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
+                    onChange={(e) => handleInputChange('hire_date', e.target.value)}
                     required
                   />
                 </div>

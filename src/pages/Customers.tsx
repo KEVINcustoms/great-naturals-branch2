@@ -14,6 +14,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { CustomerProductHistory } from "@/components/services/CustomerProductHistory";
 import { formatCurrency } from "@/lib/utils";
+import { customerValidation, CustomerFormData } from "@/utils/validation";
+import { secureFormSubmit, secureInput } from "@/utils/security";
 
 interface Customer {
   id: string;
@@ -51,7 +53,7 @@ export default function Customers() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("customers");
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<CustomerFormData>({
     name: "",
     email: "",
     phone: "",
@@ -126,43 +128,73 @@ export default function Customers() {
     setActiveTab("history");
   };
 
+  // Secure input handler with sanitization
+  const handleInputChange = (field: keyof CustomerFormData, value: string) => {
+    let sanitizedValue = value;
+    
+    switch (field) {
+      case 'name':
+        sanitizedValue = secureInput.string(value);
+        break;
+      case 'email':
+        sanitizedValue = secureInput.email(value);
+        break;
+      case 'phone':
+        sanitizedValue = secureInput.phone(value);
+        break;
+      default:
+        sanitizedValue = secureInput.string(value);
+    }
+    
+    setFormData(prev => ({ ...prev, [field]: sanitizedValue }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
     try {
-      if (editingCustomer) {
-        const { error } = await supabase
-          .from("customers")
-          .update({
-            ...formData,
-            email: formData.email || null,
-            phone: formData.phone || null,
-            hair_type: formData.hair_type || null,
-            style_preference: formData.style_preference || null,
-            notes: formData.notes || null,
-          })
-          .eq("id", editingCustomer.id);
+      // Use secure form submission wrapper
+      await secureFormSubmit(
+        customerValidation,
+        formData,
+        async (validatedData) => {
+          if (editingCustomer) {
+            const { error } = await supabase
+              .from("customers")
+              .update({
+                name: validatedData.name,
+                email: validatedData.email || null,
+                phone: validatedData.phone || null,
+                hair_type: validatedData.hair_type || null,
+                style_preference: validatedData.style_preference || null,
+                notes: validatedData.notes || null,
+              })
+              .eq("id", editingCustomer.id);
 
-        if (error) throw error;
-        toast({ title: "Success", description: "Customer updated successfully" });
-      } else {
-        const { error } = await supabase
-          .from("customers")
-          .insert({
-            ...formData,
-            email: formData.email || null,
-            phone: formData.phone || null,
-            hair_type: formData.hair_type || null,
-            style_preference: formData.style_preference || null,
-            notes: formData.notes || null,
-            created_by: user.id,
-          });
+            if (error) throw error;
+            return { success: true, message: "Customer updated successfully" };
+          } else {
+            const { error } = await supabase
+              .from("customers")
+              .insert({
+                name: validatedData.name,
+                email: validatedData.email || null,
+                phone: validatedData.phone || null,
+                hair_type: validatedData.hair_type || null,
+                style_preference: validatedData.style_preference || null,
+                notes: validatedData.notes || null,
+                created_by: user.id,
+              });
 
-        if (error) throw error;
-        toast({ title: "Success", description: "Customer created successfully" });
-      }
+            if (error) throw error;
+            return { success: true, message: "Customer created successfully" };
+          }
+        },
+        user.id
+      );
 
+      toast({ title: "Success", description: editingCustomer ? "Customer updated successfully" : "Customer created successfully" });
       setIsDialogOpen(false);
       setEditingCustomer(null);
       setFormData({ name: "", email: "", phone: "", hair_type: "", style_preference: "", notes: "" });
@@ -171,7 +203,7 @@ export default function Customers() {
       console.error("Error saving customer:", error);
       toast({
         title: "Error",
-        description: "Failed to save customer",
+        description: error.message || "Failed to save customer",
         variant: "destructive",
       });
     }
@@ -628,7 +660,7 @@ export default function Customers() {
                   <Input
                     id="name"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) => handleInputChange('name', e.target.value)}
                     required
                     className="border-gray-200 focus:border-purple-400 focus:ring-purple-400"
                   />
@@ -638,7 +670,7 @@ export default function Customers() {
                   <Input
                     id="phone"
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    onChange={(e) => handleInputChange('phone', e.target.value)}
                     className="border-gray-200 focus:border-purple-400 focus:ring-purple-400"
                   />
                 </div>
@@ -651,7 +683,7 @@ export default function Customers() {
                   id="email"
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
                   className="border-gray-200 focus:border-purple-400 focus:ring-purple-400"
                 />
               </div>
@@ -663,7 +695,7 @@ export default function Customers() {
                   <Input
                     id="hair_type"
                     value={formData.hair_type}
-                    onChange={(e) => setFormData({ ...formData, hair_type: e.target.value })}
+                    onChange={(e) => handleInputChange('hair_type', e.target.value)}
                     placeholder="e.g., Curly, Straight, Wavy"
                     className="border-gray-200 focus:border-purple-400 focus:ring-purple-400"
                   />
@@ -673,7 +705,7 @@ export default function Customers() {
                   <Input
                     id="style_preference"
                     value={formData.style_preference}
-                    onChange={(e) => setFormData({ ...formData, style_preference: e.target.value })}
+                    onChange={(e) => handleInputChange('style_preference', e.target.value)}
                     placeholder="e.g., Long layers, Bob cut"
                     className="border-gray-200 focus:border-purple-400 focus:ring-purple-400"
                   />
@@ -686,7 +718,7 @@ export default function Customers() {
                 <Textarea
                   id="notes"
                   value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  onChange={(e) => handleInputChange('notes', e.target.value)}
                   placeholder="Additional notes about the customer"
                   rows={3}
                   className="border-gray-200 focus:border-purple-400 focus:ring-purple-400"
