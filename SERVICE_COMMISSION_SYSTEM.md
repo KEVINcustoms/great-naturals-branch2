@@ -106,3 +106,5 @@ ADD COLUMN commission_rate DECIMAL(5,2) DEFAULT NULL;
 - Responsive UI for easy rate management
 
 
+
+

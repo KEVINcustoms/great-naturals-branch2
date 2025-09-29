@@ -169,3 +169,5 @@ export function SalesReceiptDialog({ isOpen, onClose, saleData }: SalesReceiptDi
     </Dialog>
   );
 }
+
+

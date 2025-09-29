@@ -20,6 +20,7 @@ import { EmailConfirmation } from "./components/auth/EmailConfirmation";
 import { Profile } from "@/hooks/useAuth";
 import { isAdmin } from "@/utils/permissions";
 import { AccessControl } from "@/components/ui/AccessControl";
+import { useRealtimePermissions } from "@/hooks/useRealtimePermissions";
 import WorkerPayroll from "./pages/WorkerPayroll";
 import FinancialAnalytics from "./pages/FinancialAnalytics";
 
@@ -27,7 +28,24 @@ const queryClient = new QueryClient();
 
 // Protected Route Component for Admin-only access
 function AdminRoute({ children, profile }: { children: React.ReactNode; profile: Profile | null }) {
-  if (!isAdmin(profile)) {
+  const { isAdmin: hasAdminAccess, isLoading: permissionsLoading } = useRealtimePermissions();
+  
+  // Show loading while permissions are being fetched
+  if (permissionsLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Checking permissions...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Check both old and new permission systems for backward compatibility
+  const hasAccess = isAdmin(profile) || hasAdminAccess;
+  
+  if (!hasAccess) {
     return <AccessDenied 
       title="Admin Access Required"
       description="This section is only available to administrators. Regular users can manage services, customers, and inventory."

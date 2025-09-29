@@ -1125,10 +1125,7 @@ export default function Inventory() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => {
-                                setEditingItem(item);
-                                setIsDialogOpen(true);
-                              }}
+                              onClick={() => openDialog(item)}
                               className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
                             >
                               <Edit className="h-4 w-4" />

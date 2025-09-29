@@ -4,8 +4,8 @@ import type { Database } from './types';
 
 // Pin to the project configured below. Remove env indirection to ensure
 // both auth and data point to the same Supabase instance.
-const SUPABASE_URL = "https://nmropehesyqmzlqxnbfb.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tcm9wZWhlc3lxbXpscXhuYmZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU4NTE4MTQsImV4cCI6MjA3MTQyNzgxNH0.GvGNZyNVTqAPj0nPlxMWPaey1iNwixhHssF37q_5OFw";
+const SUPABASE_URL = "https://mqpmakwmmmwjxmkgvdpg.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1xcG1ha3dtbW13anhta2d2ZHBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzcwODksImV4cCI6MjA3NDc1MzA4OX0.er8nHrBy6UJGcbfiW-kFjUu3omK91CQUvdGdkrlz9uI";
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

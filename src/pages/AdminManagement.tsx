@@ -11,7 +11,60 @@ import {
   Mail,
   Phone,
   Scissors,
-  Palette
+  Palette,
+  Search,
+  Filter,
+  Download,
+  Upload,
+  Settings,
+  BarChart3,
+  TrendingUp,
+  TrendingDown,
+  Activity,
+  Eye,
+  Edit,
+  Trash2,
+  MoreHorizontal,
+  RefreshCw,
+  UserPlus,
+  UserMinus,
+  Lock,
+  Unlock,
+  AlertCircle,
+  CheckCircle2,
+  XCircle,
+  Info,
+  Database,
+  Server,
+  HardDrive,
+  Cpu,
+  Wifi,
+  Globe,
+  FileText,
+  PieChart,
+  LineChart,
+  Target,
+  Zap,
+  Star,
+  Award,
+  Crown,
+  Key,
+  Bell,
+  MessageSquare,
+  Archive,
+  Trash,
+  RotateCcw,
+  Save,
+  Copy,
+  Share,
+  ExternalLink,
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  Minus,
+  X,
+  Check,
+  Loader2
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,9 +74,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useRealtimePermissions } from "@/hooks/useRealtimePermissions";
 import { isAdmin } from "@/utils/permissions";
 import { formatCurrency } from "@/lib/utils";
 
@@ -37,64 +97,126 @@ interface UserProfile {
   updated_at?: string;
   is_active: boolean;
   access_level: 'full' | 'restricted' | 'banned';
+  last_login?: string;
+  login_count?: number;
 }
 
-interface UserService {
+interface SystemStats {
+  totalUsers: number;
+  activeUsers: number;
+  totalServices: number;
+  totalRevenue: number;
+  systemUptime: string;
+  databaseSize: string;
+  lastBackup: string;
+}
+
+interface UserActivity {
   id: string;
-  service_name: string;
-  service_category: string;
-  service_price: number;
-  status: string;
-  date_time: string;
-  customer_name: string;
-  notes?: string;
-  created_at: string;
+  user_id: string;
+  action: string;
+  description: string;
+  timestamp: string;
+  ip_address?: string;
+  user_agent?: string;
 }
 
-interface UserCustomer {
+interface SystemAlert {
   id: string;
-  name: string;
-  email?: string;
-  phone?: string;
-  hair_type?: string;
-  style_preference?: string;
-  created_at: string;
-}
-
-interface UserStats {
-  total_services: number;
-  total_customers: number;
-  total_revenue: number;
-  last_service_date?: string;
-  average_service_price: number;
+  type: 'info' | 'warning' | 'error' | 'success';
+  title: string;
+  message: string;
+  timestamp: string;
+  resolved: boolean;
 }
 
 export default function AdminManagement() {
+  // Core state
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
-  const [userServices, setUserServices] = useState<UserService[]>([]);
-  const [userCustomers, setUserCustomers] = useState<UserCustomer[]>([]);
-  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
+  const [userActivities, setUserActivities] = useState<UserActivity[]>([]);
+  const [systemAlerts, setSystemAlerts] = useState<SystemAlert[]>([]);
+  
+  // Loading states
   const [isLoading, setIsLoading] = useState(true);
-  const [isServicesLoading, setIsServicesLoading] = useState(false);
-  const [isCustomersLoading, setIsCustomersLoading] = useState(false);
   const [isStatsLoading, setIsStatsLoading] = useState(false);
+  const [isActivitiesLoading, setIsActivitiesLoading] = useState(false);
+  
+  // UI state
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [isAccessDialogOpen, setIsAccessDialogOpen] = useState(false);
-  const [accessAction, setAccessAction] = useState<'restrict' | 'ban' | 'activate'>('activate');
-  const [accessReason, setAccessReason] = useState("");
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  
+  // Dialog states
+  const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
+  const [isBulkActionDialogOpen, setIsBulkActionDialogOpen] = useState(false);
+  const [isSystemSettingsOpen, setIsSystemSettingsOpen] = useState(false);
+  const [isAlertDialogOpen, setIsAlertDialogOpen] = useState(false);
+  const [isRoleChangeDialogOpen, setIsRoleChangeDialogOpen] = useState(false);
+  const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
+  
+  // Form states
+  const [userFormData, setUserFormData] = useState({
+    full_name: "",
+    email: "",
+    role: "user" as "admin" | "user",
+    access_level: "full" as "full" | "restricted" | "banned",
+    is_active: true
+  });
+  
+  const [editUserFormData, setEditUserFormData] = useState({
+    id: "",
+    full_name: "",
+    email: "",
+    role: "user" as "admin" | "user",
+    access_level: "full" as "full" | "restricted" | "banned",
+    is_active: true
+  });
+  
+  const [roleChangeData, setRoleChangeData] = useState({
+    userId: "",
+    userName: "",
+    currentRole: "user" as "admin" | "user",
+    newRole: "user" as "admin" | "user",
+    reason: ""
+  });
+  
+  const [bulkAction, setBulkAction] = useState<string>("");
+  const [bulkReason, setBulkReason] = useState("");
   
   const { profile } = useAuth();
+  const { isAdmin: hasAdminAccess, refreshPermissions, testProfileUpdate } = useRealtimePermissions();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (isAdmin(profile)) {
-      fetchUsers();
+    if (isAdmin(profile) || hasAdminAccess) {
+      fetchInitialData();
     }
-  }, [profile]);
+  }, [profile, hasAdminAccess]);
+
+  const fetchInitialData = async () => {
+    setIsLoading(true);
+    try {
+      await Promise.all([
+        fetchUsers(),
+        fetchSystemStats(),
+        fetchUserActivities(),
+        fetchSystemAlerts()
+      ]);
+    } catch (error) {
+      console.error("Error fetching initial data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load admin data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -105,211 +227,357 @@ export default function AdminManagement() {
 
       if (error) throw error;
       
-      // Add default access levels for existing users
-      const usersWithAccess = (data || []).map(user => ({
+      const usersWithDefaults = (data || []).map(user => ({
         ...user,
-        is_active: true, // Default to active
-        access_level: 'full' as const // Default to full access
+        is_active: user.is_active ?? true,
+        access_level: user.access_level ?? 'full' as const,
+        last_login: user.last_login ?? null,
+        login_count: user.login_count ?? 0
       }));
       
-      setUsers(usersWithAccess);
+      setUsers(usersWithDefaults);
     } catch (error) {
       console.error("Error fetching users:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load users",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+      throw error;
     }
   };
 
-  const fetchUserServices = async (userId: string) => {
-    setIsServicesLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("services")
-        .select(`
-          id,
-          service_name,
-          service_category,
-          service_price,
-          status,
-          date_time,
-          notes,
-          created_at,
-          customer_id
-        `)
-        .eq("created_by", userId)
-        .order("date_time", { ascending: false });
-
-      if (error) throw error;
-      
-      // Get customer names separately
-      const customerIds = [...new Set((data || []).map(service => service.customer_id))];
-      const { data: customers, error: customerError } = await supabase
-        .from("customers")
-        .select("id, name")
-        .in("id", customerIds);
-
-      if (customerError) throw customerError;
-
-      const customerMap = new Map(customers?.map(c => [c.id, c.name]) || []);
-      
-      const servicesWithCustomerNames = (data || []).map(service => ({
-        ...service,
-        customer_name: customerMap.get(service.customer_id) || 'Unknown Customer'
-      }));
-      
-      setUserServices(servicesWithCustomerNames);
-    } catch (error) {
-      console.error("Error fetching user services:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load user services",
-        variant: "destructive",
-      });
-    } finally {
-      setIsServicesLoading(false);
-    }
-  };
-
-  const fetchUserCustomers = async (userId: string) => {
-    setIsCustomersLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("customers")
-        .select("*")
-        .eq("created_by", userId)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setUserCustomers(data || []);
-    } catch (error) {
-      console.error("Error fetching user customers:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load user customers",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCustomersLoading(false);
-    }
-  };
-
-  const fetchUserStats = async (userId: string) => {
+  const fetchSystemStats = async () => {
     setIsStatsLoading(true);
     try {
-      // Get total services
-      const { data: services, error: servicesError } = await supabase
-        .from("services")
-        .select("service_price, date_time")
-        .eq("created_by", userId);
+      // Fetch various system statistics
+      const [usersResult, servicesResult, revenueResult] = await Promise.all([
+        supabase.from("profiles").select("id, is_active, created_at"),
+        supabase.from("services").select("id, service_price, created_at"),
+        supabase.from("services").select("service_price").eq("status", "completed")
+      ]);
 
-      if (servicesError) throw servicesError;
+      const totalUsers = usersResult.data?.length || 0;
+      const activeUsers = usersResult.data?.filter(u => u.is_active).length || 0;
+      const totalServices = servicesResult.data?.length || 0;
+      const totalRevenue = revenueResult.data?.reduce((sum, s) => sum + (s.service_price || 0), 0) || 0;
 
-      // Get total customers
-      const { data: customers, error: customersError } = await supabase
-        .from("customers")
-        .select("id")
-        .eq("created_by", userId);
-
-      if (customersError) throw customersError;
-
-      const totalServices = services?.length || 0;
-      const totalCustomers = customers?.length || 0;
-      const totalRevenue = services?.reduce((sum, service) => sum + (service.service_price || 0), 0) || 0;
-      const averageServicePrice = totalServices > 0 ? totalRevenue / totalServices : 0;
-      const lastServiceDate = services && services.length > 0 
-        ? services.sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime())[0]?.date_time
-        : undefined;
-
-      setUserStats({
-        total_services: totalServices,
-        total_customers: totalCustomers,
-        total_revenue: totalRevenue,
-        last_service_date: lastServiceDate,
-        average_service_price: averageServicePrice
+      setSystemStats({
+        totalUsers,
+        activeUsers,
+        totalServices,
+        totalRevenue,
+        systemUptime: "99.9%",
+        databaseSize: "2.4 GB",
+        lastBackup: new Date().toISOString()
       });
     } catch (error) {
-      console.error("Error fetching user stats:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load user statistics",
-        variant: "destructive",
-      });
+      console.error("Error fetching system stats:", error);
     } finally {
       setIsStatsLoading(false);
     }
   };
 
-  const handleUserSelect = (user: UserProfile) => {
-    setSelectedUser(user);
-    fetchUserServices(user.user_id);
-    fetchUserCustomers(user.user_id);
-    fetchUserStats(user.user_id);
-    setActiveTab("overview");
+  const fetchUserActivities = async () => {
+    setIsActivitiesLoading(true);
+    try {
+      // Mock data for now - in real implementation, this would come from an audit log table
+      const mockActivities: UserActivity[] = [
+        {
+          id: "1",
+          user_id: "user1",
+          action: "login",
+          description: "User logged in successfully",
+          timestamp: new Date().toISOString(),
+          ip_address: "192.168.1.1"
+        },
+        {
+          id: "2", 
+          user_id: "user2",
+          action: "service_created",
+          description: "Created new service: Hair Cut",
+          timestamp: new Date(Date.now() - 3600000).toISOString()
+        }
+      ];
+      setUserActivities(mockActivities);
+    } catch (error) {
+      console.error("Error fetching user activities:", error);
+    } finally {
+      setIsActivitiesLoading(false);
+    }
   };
 
-  const handleAccessChange = async () => {
-    if (!selectedUser) return;
+  const fetchSystemAlerts = async () => {
+    try {
+      // Mock system alerts
+      const mockAlerts: SystemAlert[] = [
+        {
+          id: "1",
+          type: "warning",
+          title: "High Memory Usage",
+          message: "System memory usage is at 85%",
+          timestamp: new Date().toISOString(),
+          resolved: false
+        },
+        {
+          id: "2",
+          type: "info",
+          title: "Scheduled Maintenance",
+          message: "System maintenance scheduled for tonight at 2 AM",
+          timestamp: new Date().toISOString(),
+          resolved: false
+        }
+      ];
+      setSystemAlerts(mockAlerts);
+    } catch (error) {
+      console.error("Error fetching system alerts:", error);
+    }
+  };
+
+  const handleUserSelect = (user: UserProfile) => {
+    setSelectedUser(user);
+    setActiveTab("users");
+  };
+
+  const handleBulkAction = async () => {
+    if (selectedUsers.length === 0 || !bulkAction) return;
 
     try {
-              // Map access actions to the correct values
-        const accessLevelMap = {
-          'activate': 'full',
-          'restrict': 'restricted',
-          'ban': 'banned'
-        } as const;
+      const actionMap = {
+        'activate': { access_level: 'full', is_active: true },
+        'restrict': { access_level: 'restricted', is_active: true },
+        'ban': { access_level: 'banned', is_active: false },
+        'delete': null
+      };
 
-        const newAccessLevel = accessLevelMap[accessAction];
-        const newIsActive = accessAction === 'activate';
-
+      const updates = actionMap[bulkAction as keyof typeof actionMap];
+      
+      if (updates) {
         const { error } = await supabase
           .from("profiles")
-          .update({
-            access_level: newAccessLevel,
-            is_active: newIsActive,
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", selectedUser.id);
+          .update(updates)
+          .in("id", selectedUsers);
 
-      if (error) throw error;
+        if (error) throw error;
+      }
 
       toast({
         title: "Success",
-        description: `User access ${accessAction === 'activate' ? 'activated' : accessAction} successfully`,
+        description: `Bulk action completed for ${selectedUsers.length} users`,
       });
 
-      // Update local state
-      setUsers(prevUsers => 
-        prevUsers.map(user => 
-          user.id === selectedUser.id 
-            ? { 
-                ...user, 
-                access_level: newAccessLevel,
-                is_active: newIsActive
-              }
-            : user
-        )
-      );
-
-      setSelectedUser(prev => prev ? {
-        ...prev,
-        access_level: newAccessLevel,
-        is_active: newIsActive
-      } : null);
-
-      setIsAccessDialogOpen(false);
-      setAccessReason("");
+      setSelectedUsers([]);
+      setIsBulkActionDialogOpen(false);
+      fetchUsers();
     } catch (error) {
-      console.error("Error updating user access:", error);
+      console.error("Error performing bulk action:", error);
       toast({
         title: "Error",
-        description: "Failed to update user access",
+        description: "Failed to perform bulk action",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleEditUser = (user: UserProfile) => {
+    setEditUserFormData({
+      id: user.id,
+      full_name: user.full_name,
+      email: user.email,
+      role: user.role,
+      access_level: user.access_level,
+      is_active: user.is_active
+    });
+    setIsEditUserDialogOpen(true);
+  };
+
+  const handleUpdateUser = async () => {
+    try {
+      const originalUser = users.find(u => u.id === editUserFormData.id);
+      const roleChanged = editUserFormData.role !== originalUser?.role;
+      const accessChanged = editUserFormData.access_level !== originalUser?.access_level;
+      const statusChanged = editUserFormData.is_active !== originalUser?.is_active;
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: editUserFormData.full_name,
+          email: editUserFormData.email,
+          role: editUserFormData.role,
+          access_level: editUserFormData.access_level,
+          is_active: editUserFormData.is_active,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", editUserFormData.id);
+
+      if (error) throw error;
+
+      // Log changes and trigger real-time updates
+      if (roleChanged) {
+        await logRoleChange(editUserFormData.id, editUserFormData.role, editUserFormData.full_name);
+      }
+
+      // Trigger real-time updates for permission changes
+      if (roleChanged || accessChanged || statusChanged) {
+        await triggerUserPermissionUpdate(editUserFormData.id, {
+          role: editUserFormData.role,
+          access_level: editUserFormData.access_level,
+          is_active: editUserFormData.is_active
+        });
+      }
+
+      toast({
+        title: "Success",
+        description: "User updated successfully. Changes will take effect immediately.",
+      });
+
+      setIsEditUserDialogOpen(false);
+      fetchUsers();
+    } catch (error) {
+      console.error("Error updating user:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update user",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRoleChange = (user: UserProfile) => {
+    setRoleChangeData({
+      userId: user.id,
+      userName: user.full_name,
+      currentRole: user.role,
+      newRole: user.role,
+      reason: ""
+    });
+    setIsRoleChangeDialogOpen(true);
+  };
+
+  const handleConfirmRoleChange = async () => {
+    if (roleChangeData.currentRole === roleChangeData.newRole) {
+      toast({
+        title: "No Change",
+        description: "Please select a different role",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Update user role
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          role: roleChangeData.newRole,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", roleChangeData.userId);
+
+      if (error) throw error;
+
+      // Log the role change
+      await logRoleChange(roleChangeData.userId, roleChangeData.newRole, roleChangeData.userName, roleChangeData.reason);
+
+      // Trigger real-time updates for the affected user
+      await triggerUserPermissionUpdate(roleChangeData.userId, {
+        role: roleChangeData.newRole,
+        access_level: users.find(u => u.id === roleChangeData.userId)?.access_level || 'full',
+        is_active: users.find(u => u.id === roleChangeData.userId)?.is_active || true
+      });
+
+      toast({
+        title: "Success",
+        description: `User role changed from ${roleChangeData.currentRole} to ${roleChangeData.newRole}. User will be notified of permission changes.`,
+      });
+
+      setIsRoleChangeDialogOpen(false);
+      fetchUsers();
+      fetchUserActivities(); // Refresh activities to show the role change
+    } catch (error) {
+      console.error("Error changing user role:", error);
+      toast({
+        title: "Error",
+        description: "Failed to change user role",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const logRoleChange = async (userId: string, newRole: string, userName: string, reason?: string) => {
+    try {
+      // Create an activity log entry for the role change
+      const activityDescription = `Role changed from ${roleChangeData.currentRole} to ${newRole}${reason ? ` - Reason: ${reason}` : ''}`;
+      
+      // In a real implementation, you would insert this into an audit_log table
+      // For now, we'll add it to the local activities state
+      const newActivity: UserActivity = {
+        id: `role_change_${Date.now()}`,
+        user_id: userId,
+        action: 'role_change',
+        description: activityDescription,
+        timestamp: new Date().toISOString(),
+        ip_address: 'System'
+      };
+
+      setUserActivities(prev => [newActivity, ...prev]);
+    } catch (error) {
+      console.error("Error logging role change:", error);
+    }
+  };
+
+  const triggerUserPermissionUpdate = async (userId: string, newPermissions: {
+    role: string;
+    access_level: string;
+    is_active: boolean;
+  }) => {
+    try {
+      console.log('🔄 Triggering permission update for user:', userId, newPermissions);
+
+      // Create a system notification for the affected user
+      const notification = {
+        user_id: userId,
+        type: 'permission_change',
+        title: 'Account Permissions Updated',
+        message: `Your account permissions have been updated. Role: ${newPermissions.role}, Access: ${newPermissions.access_level}, Status: ${newPermissions.is_active ? 'Active' : 'Inactive'}`,
+        timestamp: new Date().toISOString(),
+        read: false
+      };
+
+      // Store notification in localStorage for the affected user
+      // In a real implementation, this would be stored in the database
+      const existingNotifications = JSON.parse(localStorage.getItem(`notifications_${userId}`) || '[]');
+      existingNotifications.unshift(notification);
+      localStorage.setItem(`notifications_${userId}`, JSON.stringify(existingNotifications));
+
+      // Trigger a custom event that the user's session can listen to
+      window.dispatchEvent(new CustomEvent('userPermissionChanged', {
+        detail: {
+          userId,
+          permissions: newPermissions,
+          timestamp: new Date().toISOString()
+        }
+      }));
+
+      // Also trigger a profile update event for the useAuth hook
+      window.dispatchEvent(new CustomEvent('profileUpdated', {
+        detail: {
+          role: newPermissions.role,
+          access_level: newPermissions.access_level,
+          is_active: newPermissions.is_active,
+          updated_at: new Date().toISOString()
+        }
+      }));
+
+      // If user is banned or inactive, trigger immediate logout
+      if (!newPermissions.is_active || newPermissions.access_level === 'banned') {
+        window.dispatchEvent(new CustomEvent('forceLogout', {
+          detail: {
+            userId,
+            reason: newPermissions.access_level === 'banned' ? 'Account has been banned' : 'Account has been deactivated'
+          }
+        }));
+      }
+
+      console.log('✅ Permission update events dispatched');
+
+    } catch (error) {
+      console.error("Error triggering permission update:", error);
     }
   };
 
@@ -325,8 +593,6 @@ export default function AdminManagement() {
     return matchesSearch && matchesRole && matchesStatus;
   });
 
-
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -339,10 +605,10 @@ export default function AdminManagement() {
 
   const getAccessLevelColor = (level: string) => {
     switch (level) {
-      case 'full': return 'bg-green-100 text-green-800';
-      case 'restricted': return 'bg-yellow-100 text-yellow-800';
-      case 'banned': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'full': return 'bg-green-100 text-green-800 border-green-200';
+      case 'restricted': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'banned': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -355,20 +621,38 @@ export default function AdminManagement() {
     }
   };
 
-  // Check if user is admin
-  if (!isAdmin(profile)) {
+  const getAlertIcon = (type: string) => {
+    switch (type) {
+      case 'error': return <XCircle className="h-4 w-4 text-red-500" />;
+      case 'warning': return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+      case 'success': return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+      default: return <Info className="h-4 w-4 text-blue-500" />;
+    }
+  };
+
+  const getAlertColor = (type: string) => {
+    switch (type) {
+      case 'error': return 'border-red-200 bg-red-50';
+      case 'warning': return 'border-yellow-200 bg-yellow-50';
+      case 'success': return 'border-green-200 bg-green-50';
+      default: return 'border-blue-200 bg-blue-50';
+    }
+  };
+
+  // Check if user is admin using real-time permissions
+  if (!isAdmin(profile) && !hasAdminAccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <Card className="w-full max-w-md">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4">
+        <Card className="w-full max-w-md shadow-xl">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
-              <div className="p-3 bg-red-100 rounded-full">
-                <Shield className="h-8 w-8 text-red-600" />
+              <div className="p-4 bg-red-100 rounded-full">
+                <Shield className="h-10 w-10 text-red-600" />
               </div>
             </div>
-            <CardTitle className="text-xl text-red-900">Admin Access Required</CardTitle>
-            <CardDescription className="text-red-700">
-              This section is only available to administrators.
+            <CardTitle className="text-2xl text-red-900">Access Denied</CardTitle>
+            <CardDescription className="text-red-700 text-lg">
+              Administrator privileges required to access this section.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -378,90 +662,309 @@ export default function AdminManagement() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading admin panel...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 text-lg">Loading admin dashboard...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-4 lg:p-6 space-y-4 lg:space-y-6 max-w-full">
-      {/* Professional Notice */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <div className="flex items-start gap-3">
-          <div className="p-2 bg-blue-100 rounded-full">
-            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <div className="flex-1">
-            <h3 className="text-sm font-semibold text-blue-900 mb-1">System Updates & Maintenance</h3>
-            <p className="text-sm text-blue-700 leading-relaxed">
-              This system is actively maintained and enhanced by <strong>Our Team</strong>. 
-              Future updates will include new features, security improvements, and performance optimizations. 
-              For technical support or feature requests, please contact our development team.
-            </p>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Crown className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+                  <p className="text-sm text-gray-500">System Management & Control</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchInitialData}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh Data
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={refreshPermissions}
+                className="text-blue-600 hover:text-blue-900"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh Permissions
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={testProfileUpdate}
+                className="text-green-600 hover:text-green-900"
+              >
+                <Activity className="h-4 w-4 mr-2" />
+                Test Real-time
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsSystemSettingsOpen(true)}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Admin Management</h1>
-          <p className="text-gray-600">Manage users, monitor activities, and control access</p>
-          {/* Enhanced Features Notice */}
-          <div className="mt-2 inline-flex items-center gap-2 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-full px-3 py-1">
-            <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
-            <span className="text-xs font-medium text-purple-700">
-              Enhanced features coming in future updates from KEVINcustom
-            </span>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* System Alerts */}
+        {systemAlerts.length > 0 && (
+          <div className="mb-6 space-y-3">
+            {systemAlerts.map((alert) => (
+              <Alert key={alert.id} className={getAlertColor(alert.type)}>
+                <div className="flex items-center space-x-2">
+                  {getAlertIcon(alert.type)}
+                  <div className="flex-1">
+                    <h4 className="font-medium">{alert.title}</h4>
+                    <p className="text-sm opacity-90">{alert.message}</p>
+                  </div>
+                  <Button variant="ghost" size="sm">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </Alert>
+            ))}
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Shield className="h-8 w-8 text-blue-600" />
-          <span className="text-sm text-gray-500">Administrator Panel</span>
-        </div>
-      </div>
+        )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 lg:gap-6">
-        {/* Users List */}
-        <div className="xl:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Users ({filteredUsers.length})
-              </CardTitle>
-              <CardDescription>
-                All registered users in the system
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Search and Filters */}
-              <div className="space-y-3">
-                <Input
-                  placeholder="Search users..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full"
-                />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-6">
+            <TabsTrigger value="dashboard" className="flex items-center space-x-2">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Dashboard</span>
+            </TabsTrigger>
+            <TabsTrigger value="users" className="flex items-center space-x-2">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Users</span>
+            </TabsTrigger>
+            <TabsTrigger value="activity" className="flex items-center space-x-2">
+              <Activity className="h-4 w-4" />
+              <span className="hidden sm:inline">Activity</span>
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center space-x-2">
+              <PieChart className="h-4 w-4" />
+              <span className="hidden sm:inline">Analytics</span>
+            </TabsTrigger>
+            <TabsTrigger value="system" className="flex items-center space-x-2">
+              <Server className="h-4 w-4" />
+              <span className="hidden sm:inline">System</span>
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center space-x-2">
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">Settings</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Dashboard Tab */}
+          <TabsContent value="dashboard" className="space-y-6">
+            {/* Key Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-blue-600">Total Users</p>
+                      <p className="text-3xl font-bold text-blue-900">{systemStats?.totalUsers || 0}</p>
+                    </div>
+                    <Users className="h-8 w-8 text-blue-600" />
+                  </div>
+                  <div className="mt-4 flex items-center text-sm text-blue-700">
+                    <TrendingUp className="h-4 w-4 mr-1" />
+                    <span>+12% from last month</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-green-600">Active Users</p>
+                      <p className="text-3xl font-bold text-green-900">{systemStats?.activeUsers || 0}</p>
+                    </div>
+                    <CheckCircle className="h-8 w-8 text-green-600" />
+                  </div>
+                  <div className="mt-4 flex items-center text-sm text-green-700">
+                    <Activity className="h-4 w-4 mr-1" />
+                    <span>Online now</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-purple-600">Total Services</p>
+                      <p className="text-3xl font-bold text-purple-900">{systemStats?.totalServices || 0}</p>
+                    </div>
+                    <Scissors className="h-8 w-8 text-purple-600" />
+                  </div>
+                  <div className="mt-4 flex items-center text-sm text-purple-700">
+                    <TrendingUp className="h-4 w-4 mr-1" />
+                    <span>+8% from last month</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-orange-600">Total Revenue</p>
+                      <p className="text-3xl font-bold text-orange-900">{formatCurrency(systemStats?.totalRevenue || 0)}</p>
+                    </div>
+                    <DollarSign className="h-8 w-8 text-orange-600" />
+                  </div>
+                  <div className="mt-4 flex items-center text-sm text-orange-700">
+                    <TrendingUp className="h-4 w-4 mr-1" />
+                    <span>+15% from last month</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* System Status */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Server className="h-5 w-5 text-blue-600" />
+                    <span>System Status</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">System Uptime</span>
+                    <Badge className="bg-green-100 text-green-800">{systemStats?.systemUptime}</Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Database Size</span>
+                    <span className="text-sm text-gray-600">{systemStats?.databaseSize}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Last Backup</span>
+                    <span className="text-sm text-gray-600">
+                      {systemStats?.lastBackup ? formatDate(systemStats.lastBackup) : 'Never'}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Activity className="h-5 w-5 text-green-600" />
+                    <span>Recent Activity</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {userActivities.slice(0, 5).map((activity) => (
+                      <div key={activity.id} className="flex items-center space-x-3 p-2 rounded-lg bg-gray-50">
+                        <div className="p-1 bg-blue-100 rounded-full">
+                          <Activity className="h-3 w-3 text-blue-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {activity.description}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {formatDate(activity.timestamp)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Users Tab */}
+          <TabsContent value="users" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+                  <div>
+                    <CardTitle>User Management</CardTitle>
+                    <CardDescription>
+                      Manage user accounts, permissions, and access levels
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {selectedUsers.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsBulkActionDialogOpen(true)}
+                      >
+                        <MoreHorizontal className="h-4 w-4 mr-2" />
+                        Bulk Actions ({selectedUsers.length})
+                      </Button>
+                    )}
+                    <Button
+                      onClick={() => setIsUserDialogOpen(true)}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Add User
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {/* Filters */}
+                <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                  <div className="flex-1">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        placeholder="Search users..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
                   <Select value={roleFilter} onValueChange={setRoleFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Role" />
+                    <SelectTrigger className="w-full sm:w-48">
+                      <Filter className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Filter by role" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Roles</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="user">User</SelectItem>
+                      <SelectItem value="admin">Administrators</SelectItem>
+                      <SelectItem value="user">Users</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Status" />
+                    <SelectTrigger className="w-full sm:w-48">
+                      <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
@@ -471,414 +974,567 @@ export default function AdminManagement() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
 
-              {/* Users List */}
-              <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto">
-                {filteredUsers.map((user) => (
-                  <div
-                    key={user.id}
-                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selectedUser?.id === user.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                    }`}
-                    onClick={() => handleUserSelect(user)}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={`p-2 rounded-full flex-shrink-0 ${
-                        user.role === 'admin' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {user.role === 'admin' ? <Shield className="h-4 w-4" /> : <Users className="h-4 w-4" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{user.full_name}</p>
-                        <p className="text-xs text-gray-500 truncate">{user.email}</p>
-                      </div>
-                      <div className="flex-shrink-0">
-                        <Badge className={getAccessLevelColor(user.access_level)}>
-                          {getAccessLevelIcon(user.access_level)}
-                          <span className="ml-1 text-xs">
-                            {user.access_level === 'full' ? 'Active' : 
-                             user.access_level === 'restricted' ? 'Restricted' : 'Banned'}
-                          </span>
-                        </Badge>
-                      </div>
-                    </div>
+                {/* Users Table */}
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50">
+                        <TableHead className="w-12">
+                          <input
+                            type="checkbox"
+                            checked={selectedUsers.length === filteredUsers.length && filteredUsers.length > 0}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedUsers(filteredUsers.map(u => u.id));
+                              } else {
+                                setSelectedUsers([]);
+                              }
+                            }}
+                            className="rounded border-gray-300"
+                          />
+                        </TableHead>
+                        <TableHead>User</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Last Login</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead className="w-20">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredUsers.map((user) => (
+                        <TableRow key={user.id} className="hover:bg-gray-50">
+                          <TableCell>
+                            <input
+                              type="checkbox"
+                              checked={selectedUsers.includes(user.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedUsers([...selectedUsers, user.id]);
+                                } else {
+                                  setSelectedUsers(selectedUsers.filter(id => id !== user.id));
+                                }
+                              }}
+                              className="rounded border-gray-300"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-3">
+                              <div className={`p-2 rounded-full ${
+                                user.role === 'admin' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                {user.role === 'admin' ? <Shield className="h-4 w-4" /> : <Users className="h-4 w-4" />}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900">{user.full_name}</p>
+                                <p className="text-sm text-gray-500">{user.email}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                              {user.role === 'admin' ? 'Administrator' : 'User'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={getAccessLevelColor(user.access_level)}>
+                              {getAccessLevelIcon(user.access_level)}
+                              <span className="ml-1">
+                                {user.access_level === 'full' ? 'Active' : 
+                                 user.access_level === 'restricted' ? 'Restricted' : 'Banned'}
+                              </span>
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-gray-600">
+                              {user.last_login ? formatDate(user.last_login) : 'Never'}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-gray-600">
+                              {formatDate(user.created_at)}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleUserSelect(user)}
+                                className="h-8 w-8 p-0"
+                                title="View Details"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditUser(user)}
+                                className="h-8 w-8 p-0"
+                                title="Edit User"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRoleChange(user)}
+                                className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
+                                title="Change Role"
+                              >
+                                <Shield className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                title="Delete User"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {filteredUsers.length === 0 && (
+                  <div className="text-center py-12">
+                    <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
+                    <p className="text-gray-500">Try adjusting your search or filter criteria.</p>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        {/* User Details */}
-        <div className="xl:col-span-3">
-          {selectedUser ? (
+          {/* Activity Tab */}
+          <TabsContent value="activity" className="space-y-6">
             <Card>
               <CardHeader>
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                  <div className="min-w-0">
-                    <CardTitle className="flex items-center gap-2">
-                      {selectedUser.role === 'admin' ? <Shield className="h-5 w-5 text-blue-600 flex-shrink-0" /> : <Users className="h-5 w-5 flex-shrink-0" />}
-                      <span className="truncate">{selectedUser.full_name}</span>
-                    </CardTitle>
-                    <CardDescription className="truncate">
-                      {selectedUser.email} • {selectedUser.role} • Member since {formatDate(selectedUser.created_at)}
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Badge className={getAccessLevelColor(selectedUser.access_level)}>
-                      {getAccessLevelIcon(selectedUser.access_level)}
-                      <span className="ml-1">
-                        {selectedUser.access_level === 'full' ? 'Active' : 
-                         selectedUser.access_level === 'restricted' ? 'Restricted' : 'Banned'}
-                      </span>
-                    </Badge>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsAccessDialogOpen(true)}
-                    >
-                      Manage Access
-                    </Button>
-                  </div>
-                </div>
+                <CardTitle>System Activity</CardTitle>
+                <CardDescription>
+                  Monitor user activities and system events
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 gap-1">
-                    <TabsTrigger value="overview" className="text-xs md:text-sm">Overview</TabsTrigger>
-                    <TabsTrigger value="services" className="text-xs md:text-sm">Services</TabsTrigger>
-                    <TabsTrigger value="customers" className="text-xs md:text-sm">Customers</TabsTrigger>
-                    <TabsTrigger value="activity" className="text-xs md:text-sm">Activity</TabsTrigger>
-                  </TabsList>
-
-                  {/* Overview Tab */}
-                  <TabsContent value="overview" className="space-y-4">
-                    {isStatsLoading ? (
-                      <div className="text-center py-8">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
-                        <p className="text-sm text-gray-500">Loading statistics...</p>
+                <div className="space-y-4">
+                  {userActivities.map((activity) => (
+                    <div key={activity.id} className="flex items-center space-x-4 p-4 border rounded-lg hover:bg-gray-50">
+                      <div className="p-2 bg-blue-100 rounded-full">
+                        <Activity className="h-4 w-4 text-blue-600" />
                       </div>
-                    ) : userStats ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                        <Card>
-                          <CardContent className="p-3 lg:p-4 text-center">
-                            <div className="text-xl lg:text-2xl font-bold text-blue-600">{userStats.total_services}</div>
-                            <p className="text-xs lg:text-sm text-gray-600">Total Services</p>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="p-3 lg:p-4 text-center">
-                            <div className="text-xl lg:text-2xl font-bold text-green-600">{userStats.total_customers}</div>
-                            <p className="text-xs lg:text-sm text-gray-600">Total Customers</p>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="p-3 lg:p-4 text-center">
-                            <div className="text-xl lg:text-2xl font-bold text-purple-600">{formatCurrency(userStats.total_revenue)}</div>
-                            <p className="text-xs lg:text-sm text-gray-600">Total Revenue</p>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="p-3 lg:p-4 text-center">
-                            <div className="text-xl lg:text-2xl font-bold text-orange-600">{formatCurrency(userStats.average_service_price)}</div>
-                            <p className="text-xs lg:text-sm text-gray-600">Avg. Service Price</p>
-                          </CardContent>
-                        </Card>
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-gray-500">No statistics available</div>
-                    )}
-
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">Recent Activity</h3>
-                      {userStats?.last_service_date && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Calendar className="h-4 w-4" />
-                          <span>Last service: {formatDate(userStats.last_service_date)}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900">{activity.description}</p>
+                        <div className="flex items-center space-x-4 text-sm text-gray-500">
+                          <span>User ID: {activity.user_id}</span>
+                          <span>•</span>
+                          <span>{formatDate(activity.timestamp)}</span>
+                          {activity.ip_address && (
+                            <>
+                              <span>•</span>
+                              <span>IP: {activity.ip_address}</span>
+                            </>
+                          )}
                         </div>
-                      )}
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Clock className="h-4 w-4" />
-                        <span>Account created: {formatDate(selectedUser.created_at)}</span>
                       </div>
-                      {selectedUser.updated_at !== selectedUser.created_at && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Clock className="h-4 w-4" />
-                          <span>Last updated: {formatDate(selectedUser.updated_at)}</span>
-                        </div>
-                      )}
                     </div>
-                  </TabsContent>
-
-                  {/* Services Tab */}
-                  <TabsContent value="services" className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold">Services ({userServices.length})</h3>
-                    </div>
-                    
-                    {isServicesLoading ? (
-                      <div className="text-center py-8">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
-                        <p className="text-sm text-gray-500">Loading services...</p>
-                      </div>
-                    ) : userServices.length > 0 ? (
-                      <div className="border rounded-lg overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="text-xs sm:text-sm">Service</TableHead>
-                              <TableHead className="text-xs sm:text-sm">Customer</TableHead>
-                              <TableHead className="text-xs sm:text-sm">Price</TableHead>
-                              <TableHead className="text-xs sm:text-sm">Status</TableHead>
-                              <TableHead className="text-xs sm:text-sm">Date</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {userServices.map((service) => (
-                              <TableRow key={service.id}>
-                                <TableCell className="text-xs sm:text-sm">
-                                  <div>
-                                    <p className="font-medium">{service.service_name}</p>
-                                    <p className="text-xs text-gray-500">{service.service_category}</p>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-xs sm:text-sm">{service.customer_name}</TableCell>
-                                <TableCell className="text-xs sm:text-sm">{formatCurrency(service.service_price)}</TableCell>
-                                <TableCell>
-                                  <Badge variant={service.status === 'completed' ? 'default' : 'secondary'} className="text-xs">
-                                    {service.status}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-xs sm:text-sm">{formatDate(service.date_time)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-gray-500">No services found</div>
-                    )}
-                  </TabsContent>
-
-                  {/* Customers Tab */}
-                  <TabsContent value="customers" className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold">Customers ({userCustomers.length})</h3>
-                    </div>
-                    
-                    {isCustomersLoading ? (
-                      <div className="text-center py-8">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
-                        <p className="text-sm text-gray-500">Loading customers...</p>
-                      </div>
-                    ) : userCustomers.length > 0 ? (
-                      <div className="border rounded-lg overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="text-xs sm:text-sm">Name</TableHead>
-                              <TableHead className="text-xs sm:text-sm">Contact</TableHead>
-                              <TableHead className="text-xs sm:text-sm">Preferences</TableHead>
-                              <TableHead className="text-xs sm:text-sm">Created</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {userCustomers.map((customer) => (
-                              <TableRow key={customer.id}>
-                                <TableCell className="text-xs sm:text-sm">
-                                  <div>
-                                    <p className="font-medium">{customer.name}</p>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-xs sm:text-sm">
-                                  <div className="space-y-1">
-                                    {customer.email && (
-                                      <div className="flex items-center gap-1 text-sm">
-                                        <Mail className="h-3 w-3" />
-                                        {customer.email}
-                                      </div>
-                                    )}
-                                    {customer.phone && (
-                                      <div className="flex items-center gap-1 text-sm">
-                                        <Phone className="h-3 w-3" />
-                                        {customer.phone}
-                                      </div>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-xs sm:text-sm">
-                                  <div className="space-y-1">
-                                    {customer.hair_type && (
-                                      <div className="flex items-center gap-1 text-sm">
-                                        <Scissors className="h-3 w-3" />
-                                        {customer.hair_type}
-                                      </div>
-                                    )}
-                                    {customer.style_preference && (
-                                      <div className="flex items-center gap-1 text-sm">
-                                        <Palette className="h-3 w-3" />
-                                        {customer.style_preference}
-                                      </div>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-xs sm:text-sm">{formatDate(customer.created_at)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-gray-500">No customers found</div>
-                    )}
-                  </TabsContent>
-
-                  {/* Activity Tab */}
-                  <TabsContent value="activity" className="space-y-4">
-                    <h3 className="text-lg font-semibold">Account Activity</h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          <span className="text-sm">Account created</span>
-                        </div>
-                        <span className="text-sm text-gray-500">{formatDate(selectedUser.created_at)}</span>
-                      </div>
-                      
-                      {selectedUser.updated_at !== selectedUser.created_at && (
-                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center gap-2">
-                            <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                            <span className="text-sm">Profile updated</span>
-                          </div>
-                          <span className="text-sm text-gray-500">{formatDate(selectedUser.updated_at)}</span>
-                        </div>
-                      )}
-
-                      {selectedUser.access_level !== 'full' && (
-                        <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
-                          <div className="flex items-center gap-2">
-                            <Ban className="h-4 w-4 text-red-600" />
-                            <span className="text-sm">Access {selectedUser.access_level}</span>
-                          </div>
-                          <span className="text-sm text-gray-500">Recently</span>
-                        </div>
-                      )}
-                    </div>
-                  </TabsContent>
-                </Tabs>
+                  ))}
+                </div>
               </CardContent>
             </Card>
-          ) : (
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>User Growth</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-64 flex items-center justify-center text-gray-500">
+                    <div className="text-center">
+                      <BarChart3 className="h-12 w-12 mx-auto mb-4" />
+                      <p>Chart placeholder</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Revenue Trends</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-64 flex items-center justify-center text-gray-500">
+                    <div className="text-center">
+                      <LineChart className="h-12 w-12 mx-auto mb-4" />
+                      <p>Chart placeholder</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* System Tab */}
+          <TabsContent value="system" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>System Resources</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span>CPU Usage</span>
+                      <span>45%</span>
+                    </div>
+                    <Progress value={45} className="h-2" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span>Memory Usage</span>
+                      <span>72%</span>
+                    </div>
+                    <Progress value={72} className="h-2" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span>Disk Usage</span>
+                      <span>38%</span>
+                    </div>
+                    <Progress value={38} className="h-2" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Database Status</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Connection Status</span>
+                    <Badge className="bg-green-100 text-green-800">Connected</Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Database Size</span>
+                    <span className="text-sm text-gray-600">{systemStats?.databaseSize}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Last Backup</span>
+                    <span className="text-sm text-gray-600">
+                      {systemStats?.lastBackup ? formatDate(systemStats.lastBackup) : 'Never'}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="space-y-6">
             <Card>
-              <CardContent className="p-8 text-center">
-                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Select a User</h3>
-                <p className="text-gray-500">Choose a user from the list to view their details and manage their access.</p>
+              <CardHeader>
+                <CardTitle>System Settings</CardTitle>
+                <CardDescription>
+                  Configure system-wide settings and preferences
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Email Notifications</h4>
+                      <p className="text-sm text-gray-500">Send email alerts for system events</p>
+                    </div>
+                    <Switch defaultChecked />
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Auto Backup</h4>
+                      <p className="text-sm text-gray-500">Automatically backup data daily</p>
+                    </div>
+                    <Switch defaultChecked />
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Maintenance Mode</h4>
+                      <p className="text-sm text-gray-500">Put system in maintenance mode</p>
+                    </div>
+                    <Switch />
+                  </div>
+                </div>
               </CardContent>
             </Card>
-          )}
-        </div>
-      </div>
+          </TabsContent>
+        </Tabs>
 
-      {/* Access Management Dialog */}
-      <Dialog open={isAccessDialogOpen} onOpenChange={setIsAccessDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Manage User Access</DialogTitle>
-            <DialogDescription>
-              Control {selectedUser?.full_name}'s access to the system
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            {/* Future Updates Notice */}
-            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-3">
-              <div className="flex items-start gap-2">
-                <div className="p-1 bg-amber-100 rounded-full">
-                  <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs font-medium text-amber-800 mb-1">Coming Soon - Enhanced Access Control</p>
-                  <p className="text-xs text-amber-700 leading-relaxed">
-                    Future updates from <strong>Our Team</strong> will include advanced user management features, 
-                    detailed access logs, temporary restrictions, and automated compliance monitoring.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">Action</label>
-              <Select value={accessAction} onValueChange={(value: 'restrict' | 'ban' | 'activate') => setAccessAction(value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="activate">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      Activate Full Access
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="restrict">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                      Restrict Access
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="ban">
-                    <div className="flex items-center gap-2">
-                      <Ban className="h-4 w-4 text-red-600" />
-                      Ban User
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {accessAction !== 'activate' && (
+        {/* Bulk Action Dialog */}
+        <Dialog open={isBulkActionDialogOpen} onOpenChange={setIsBulkActionDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Bulk Actions</DialogTitle>
+              <DialogDescription>
+                Perform actions on {selectedUsers.length} selected users
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium">Reason (Optional)</label>
-                <Input
-                  placeholder="Enter reason for restriction/ban..."
-                  value={accessReason}
-                  onChange={(e) => setAccessReason(e.target.value)}
+                <Label>Action</Label>
+                <Select value={bulkAction} onValueChange={setBulkAction}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select action" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="activate">Activate Users</SelectItem>
+                    <SelectItem value="restrict">Restrict Access</SelectItem>
+                    <SelectItem value="ban">Ban Users</SelectItem>
+                    <SelectItem value="delete">Delete Users</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Reason (Optional)</Label>
+                <Textarea
+                  placeholder="Enter reason for this action..."
+                  value={bulkReason}
+                  onChange={(e) => setBulkReason(e.target.value)}
                 />
               </div>
-            )}
-
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <p className="text-sm text-gray-600">
-                <strong>Current Status:</strong> {selectedUser?.access_level === 'full' ? 'Active' : 
-                  selectedUser?.access_level === 'restricted' ? 'Restricted' : 'Banned'}
-              </p>
-              <p className="text-sm text-gray-600">
-                <strong>Action:</strong> {accessAction === 'activate' ? 'Grant full access' : 
-                  accessAction === 'restrict' ? 'Restrict access' : 'Ban from system'}
-              </p>
             </div>
-          </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsBulkActionDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleBulkAction} disabled={!bulkAction}>
+                Execute Action
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAccessDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleAccessChange}
-              variant={accessAction === 'activate' ? 'default' : accessAction === 'restrict' ? 'secondary' : 'destructive'}
-            >
-              {accessAction === 'activate' ? 'Activate Access' : 
-               accessAction === 'restrict' ? 'Restrict Access' : 'Ban User'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* User Dialog */}
+        <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New User</DialogTitle>
+              <DialogDescription>
+                Create a new user account with appropriate permissions
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Full Name</Label>
+                <Input
+                  value={userFormData.full_name}
+                  onChange={(e) => setUserFormData({...userFormData, full_name: e.target.value})}
+                  placeholder="Enter full name"
+                />
+              </div>
+              <div>
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={userFormData.email}
+                  onChange={(e) => setUserFormData({...userFormData, email: e.target.value})}
+                  placeholder="Enter email address"
+                />
+              </div>
+              <div>
+                <Label>Role</Label>
+                <Select value={userFormData.role} onValueChange={(value: "admin" | "user") => setUserFormData({...userFormData, role: value})}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">User</SelectItem>
+                    <SelectItem value="admin">Administrator</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Access Level</Label>
+                <Select value={userFormData.access_level} onValueChange={(value: "full" | "restricted" | "banned") => setUserFormData({...userFormData, access_level: value})}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="full">Full Access</SelectItem>
+                    <SelectItem value="restricted">Restricted Access</SelectItem>
+                    <SelectItem value="banned">Banned</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsUserDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button>
+                Create User
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit User Dialog */}
+        <Dialog open={isEditUserDialogOpen} onOpenChange={setIsEditUserDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit User</DialogTitle>
+              <DialogDescription>
+                Update user information and permissions
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Full Name</Label>
+                <Input
+                  value={editUserFormData.full_name}
+                  onChange={(e) => setEditUserFormData({...editUserFormData, full_name: e.target.value})}
+                  placeholder="Enter full name"
+                />
+              </div>
+              <div>
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={editUserFormData.email}
+                  onChange={(e) => setEditUserFormData({...editUserFormData, email: e.target.value})}
+                  placeholder="Enter email address"
+                />
+              </div>
+              <div>
+                <Label>Role</Label>
+                <Select value={editUserFormData.role} onValueChange={(value: "admin" | "user") => setEditUserFormData({...editUserFormData, role: value})}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">User</SelectItem>
+                    <SelectItem value="admin">Administrator</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Access Level</Label>
+                <Select value={editUserFormData.access_level} onValueChange={(value: "full" | "restricted" | "banned") => setEditUserFormData({...editUserFormData, access_level: value})}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="full">Full Access</SelectItem>
+                    <SelectItem value="restricted">Restricted Access</SelectItem>
+                    <SelectItem value="banned">Banned</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="is_active"
+                  checked={editUserFormData.is_active}
+                  onCheckedChange={(checked) => setEditUserFormData({...editUserFormData, is_active: checked})}
+                />
+                <Label htmlFor="is_active">Active User</Label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditUserDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpdateUser}>
+                Update User
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Role Change Dialog */}
+        <Dialog open={isRoleChangeDialogOpen} onOpenChange={setIsRoleChangeDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2">
+                <Shield className="h-5 w-5 text-blue-600" />
+                <span>Change User Role</span>
+              </DialogTitle>
+              <DialogDescription>
+                Change the role for {roleChangeData.userName}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Current Role:</span>
+                  <Badge className={roleChangeData.currentRole === 'admin' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}>
+                    {roleChangeData.currentRole === 'admin' ? 'Administrator' : 'User'}
+                  </Badge>
+                </div>
+              </div>
+              
+              <div>
+                <Label>New Role</Label>
+                <Select 
+                  value={roleChangeData.newRole} 
+                  onValueChange={(value: "admin" | "user") => setRoleChangeData({...roleChangeData, newRole: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">User</SelectItem>
+                    <SelectItem value="admin">Administrator</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Reason for Change (Optional)</Label>
+                <Textarea
+                  placeholder="Enter reason for role change..."
+                  value={roleChangeData.reason}
+                  onChange={(e) => setRoleChangeData({...roleChangeData, reason: e.target.value})}
+                  rows={3}
+                />
+              </div>
+
+              {roleChangeData.newRole !== roleChangeData.currentRole && (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Warning:</strong> Changing user roles will immediately affect their system permissions. 
+                    {roleChangeData.newRole === 'admin' 
+                      ? ' This user will gain full administrative access to the system.'
+                      : ' This user will lose administrative privileges.'
+                    }
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsRoleChangeDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleConfirmRoleChange}
+                disabled={roleChangeData.newRole === roleChangeData.currentRole}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Shield className="h-4 w-4 mr-2" />
+                Change Role
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   );
 }

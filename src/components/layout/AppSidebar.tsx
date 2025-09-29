@@ -27,31 +27,33 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
+import { useRealtimePermissions } from "@/hooks/useRealtimePermissions";
 import { Button } from "@/components/ui/button";
 import { getUserRoleDisplay, isAdmin } from "@/utils/permissions";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-// All available menu items
+// All available menu items with permission requirements
 const allMenuItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard, adminOnly: true },
-  { title: "Services", url: "/services", icon: ClipboardList, adminOnly: false },
-  { title: "Customers", url: "/customers", icon: Users, adminOnly: false },
-  { title: "Workers", url: "/workers", icon: UserCheck, adminOnly: true },
-  { title: "Inventory", url: "/inventory", icon: Package, adminOnly: false },
-  { title: "Alerts", url: "/alerts", icon: AlertTriangle, adminOnly: false },
+  { title: "Dashboard", url: "/", icon: LayoutDashboard, requiredFeature: "dashboard" },
+  { title: "Services", url: "/services", icon: ClipboardList, requiredFeature: "services" },
+  { title: "Customers", url: "/customers", icon: Users, requiredFeature: "customers" },
+  { title: "Workers", url: "/workers", icon: UserCheck, requiredFeature: "workers" },
+  { title: "Inventory", url: "/inventory", icon: Package, requiredFeature: "inventory" },
+  { title: "Alerts", url: "/alerts", icon: AlertTriangle, requiredFeature: "alerts" },
 ];
 
 const adminItems = [
-  { title: "Admin Management", url: "/admin", icon: Shield },
-  { title: "Worker Payroll", url: "/worker-payroll", icon: DollarSign },
-  { title: "Financial Analytics", url: "/financial-analytics", icon: BarChart3 },
-  { title: "Settings", url: "/settings", icon: Settings },
+  { title: "Admin Management", url: "/admin", icon: Shield, requiredRole: "admin" },
+  { title: "Worker Payroll", url: "/worker-payroll", icon: DollarSign, requiredFeature: "workers" },
+  { title: "Financial Analytics", url: "/financial-analytics", icon: BarChart3, requiredFeature: "reports" },
+  { title: "Settings", url: "/settings", icon: Settings, requiredFeature: "settings" },
 ];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
   const { profile, signOut, isSigningOut } = useAuth();
+  const { canAccess, isAdmin: hasAdminAccess, isBanned } = useRealtimePermissions();
   const currentPath = location.pathname;
 
   const handleSignOut = () => {
@@ -60,8 +62,24 @@ export function AppSidebar() {
     }
   };
 
-  // Filter menu items based on user role
-  const menuItems = allMenuItems.filter(item => !item.adminOnly || isAdmin(profile));
+  // Filter menu items based on user permissions
+  const menuItems = allMenuItems.filter(item => {
+    if (item.requiredFeature) {
+      return canAccess(item.requiredFeature);
+    }
+    return true;
+  });
+
+  // Filter admin items based on permissions
+  const filteredAdminItems = adminItems.filter(item => {
+    if (item.requiredRole === 'admin') {
+      return hasAdminAccess;
+    }
+    if (item.requiredFeature) {
+      return canAccess(item.requiredFeature);
+    }
+    return true;
+  });
 
   const isActive = (path: string) => {
     if (path === "/") return currentPath === "/";
@@ -121,12 +139,12 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {isAdmin(profile) && (
+        {filteredAdminItems.length > 0 && (
           <SidebarGroup>
             <SidebarGroupLabel>Admin</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {adminItems.map((item) => (
+                {filteredAdminItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild>
                       <NavLink 

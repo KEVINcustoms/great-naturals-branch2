@@ -280,6 +280,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [initializeAuth, handleAuthStateChange]);
 
+  // Listen for profile updates from real-time permissions
+  useEffect(() => {
+    const handleProfileUpdate = async (event: CustomEvent) => {
+      if (!user) return;
+      
+      const { role, access_level, is_active, updated_at } = event.detail;
+      
+      // Update the profile state with new data
+      setProfile(prev => prev ? {
+        ...prev,
+        role: role || prev.role,
+        access_level: access_level || prev.access_level,
+        is_active: is_active !== undefined ? is_active : prev.is_active,
+        updated_at: updated_at || prev.updated_at
+      } : null);
+      
+      console.log('Profile updated via real-time permissions:', { role, access_level, is_active });
+    };
+
+    window.addEventListener('profileUpdated', handleProfileUpdate as EventListener);
+
+    return () => {
+      window.removeEventListener('profileUpdated', handleProfileUpdate as EventListener);
+    };
+  }, [user]);
+
   const signOut = async () => {
     try {
       console.log('Signing out...');

@@ -389,3 +389,5 @@ export const SecurityDashboard = () => {
 ---
 
 *This implementation example provides a solid foundation for securing your salon management system. Start with the high-priority items and gradually implement the remaining security measures.*
+
+

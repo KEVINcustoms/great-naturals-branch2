@@ -2,12 +2,14 @@ import { ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { NotificationBadge } from "./NotificationBadge";
+import { NotificationSystem } from "@/components/NotificationSystem";
 import { useAuth } from "@/hooks/useAuth";
+import { useRealtimePermissions } from "@/hooks/useRealtimePermissions";
 import { useInventoryAlerts } from "@/hooks/useInventoryAlerts";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, Shield, AlertTriangle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface AppLayoutProps {
@@ -16,6 +18,7 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { profile, signOut, isSigningOut } = useAuth();
+  const { permissions, isBanned, hasFullAccess } = useRealtimePermissions();
   
   // Initialize automated inventory alerts
   useInventoryAlerts();
@@ -42,13 +45,27 @@ export function AppLayout({ children }: AppLayoutProps) {
             
             {profile && (
               <div className="flex items-center gap-3">
+                <NotificationSystem />
                 <NotificationBadge />
                 <Card className="px-3 py-1">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">{profile.full_name}</span>
-                    <Badge variant={profile.role === 'admin' ? 'default' : 'secondary'}>
-                      {profile.role}
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                      <Badge variant={profile.role === 'admin' ? 'default' : 'secondary'}>
+                        {profile.role}
+                      </Badge>
+                      {permissions && (
+                        <Badge 
+                          variant={permissions.access_level === 'full' ? 'default' : 'secondary'}
+                          className={permissions.access_level === 'banned' ? 'bg-red-100 text-red-800' : ''}
+                        >
+                          {permissions.access_level}
+                        </Badge>
+                      )}
+                      {isBanned && (
+                        <AlertTriangle className="h-4 w-4 text-red-500" />
+                      )}
+                    </div>
                   </div>
                 </Card>
                 <TooltipProvider>

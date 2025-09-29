@@ -146,3 +146,5 @@ GRANT EXECUTE ON FUNCTION public.deduct_inventory_for_service(UUID, UUID) TO aut
 -- 5. Add comment to document the column
 COMMENT ON COLUMN public.service_products.total_price IS 'Total price for this product in the service (quantity * price_per_unit)';
 
+
+
