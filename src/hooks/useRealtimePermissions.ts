@@ -91,10 +91,12 @@ export function useRealtimePermissions() {
     
     // Define feature permissions for regular users
     const featurePermissions: { [key: string]: string[] } = {
-      'inventory': ['full', 'restricted'],
-      'customers': ['full', 'restricted'],
-      'services': ['full', 'restricted'],
-      'workers': ['full'],
+      'dashboard': ['full', 'restricted', 'basic'],
+      'inventory': ['full', 'restricted', 'basic'],
+      'customers': ['full', 'restricted', 'basic'],
+      'services': ['full', 'restricted', 'basic'],
+      'workers': ['full', 'restricted'],
+      'alerts': ['full', 'restricted', 'basic'],
       'admin': ['full'], // Only full access users can access admin
       'reports': ['full'],
       'settings': ['full']
