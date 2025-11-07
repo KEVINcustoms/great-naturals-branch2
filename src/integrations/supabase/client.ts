@@ -4,8 +4,8 @@ import type { Database } from './types';
 
 // Pin to the project configured below. Remove env indirection to ensure
 // both auth and data point to the same Supabase instance.
-const SUPABASE_URL = "https://mqpmakwmmmwjxmkgvdpg.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1xcG1ha3dtbW13anhta2d2ZHBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzcwODksImV4cCI6MjA3NDc1MzA4OX0.er8nHrBy6UJGcbfiW-kFjUu3omK91CQUvdGdkrlz9uI";
+const SUPABASE_URL = "https://gqtrpfmxbqikczkzmujp.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxdHJwZm14YnFpa2N6a3ptdWpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI1MTExNTAsImV4cCI6MjA3ODA4NzE1MH0.Xuabn7qy1bFKfPn0H_vb9aleCuEHf5wO3Syq30uNYPY";
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
@@ -15,5 +15,6 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+
   }
 });

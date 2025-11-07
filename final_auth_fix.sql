@@ -19,7 +19,7 @@ BEGIN
     NEW.email,
     COALESCE(NEW.raw_user_meta_data ->> 'full_name', 'User'),
     CASE 
-      WHEN NEW.email = 'devzoratech@gmail.com' THEN 'admin'::app_role
+      WHEN NEW.email = 'kevouganda7@gmail.com' THEN 'admin'::app_role
       ELSE 'user'::app_role
     END
   );

@@ -9,7 +9,7 @@ SELECT
   'Admin User',
   'admin'::app_role
 FROM auth.users 
-WHERE email = 'devzoratech@gmail.com'
+WHERE email = 'kevouganda7@gmail.com'
 ON CONFLICT (user_id) DO UPDATE SET
   email = EXCLUDED.email,
   full_name = EXCLUDED.full_name,
