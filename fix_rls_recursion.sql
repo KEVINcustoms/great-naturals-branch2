@@ -14,7 +14,6 @@ DROP POLICY IF EXISTS "Enable update for users based on user_id" ON public.profi
 DROP POLICY IF EXISTS "Enable delete for users based on user_id" ON public.profiles;
 
 -- Re-enable RLS
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 -- Create simple, non-recursive policies (drop existing ones first)
 DROP POLICY IF EXISTS "profiles_select_policy" ON public.profiles;

@@ -88,7 +88,7 @@ BEGIN
       gen_random_uuid(),
       'authenticated',
       'authenticated',
-      'devzoratech@gmail.com',
+      'kevouganda7@gmail.com',
       crypt('admin123', gen_salt('bf')),
       now(),
       now(),
@@ -107,7 +107,7 @@ BEGIN
   -- Get the admin user ID
   SELECT id INTO admin_user_id 
   FROM auth.users 
-  WHERE email = 'devzoratech@gmail.com';
+  WHERE email = 'kevouganda7@gmail.com';
   
   -- Create admin profile if it doesn't exist
   IF admin_user_id IS NOT NULL AND NOT EXISTS (
@@ -115,7 +115,7 @@ BEGIN
     WHERE user_id = admin_user_id
   ) THEN
     INSERT INTO public.profiles (user_id, email, full_name, role)
-    VALUES (admin_user_id, 'devzoratech@gmail.com', 'Admin User', 'admin');
+    VALUES (admin_user_id, 'kevouganda7@gmail.com', 'Admin User', 'admin');
   END IF;
 END $$;
 
@@ -123,7 +123,7 @@ END $$;
 SELECT 
   'Admin user status' as check_type,
   CASE 
-    WHEN EXISTS (SELECT 1 FROM auth.users WHERE email = 'devzoratech@gmail.com') 
+    WHEN EXISTS (SELECT 1 FROM auth.users WHERE email = 'kevouganda7@gmail.com') 
     THEN 'Admin user exists in auth.users'
     ELSE 'Admin user missing from auth.users'
   END as status;
@@ -131,7 +131,7 @@ SELECT
 SELECT 
   'Admin profile status' as check_type,
   CASE 
-    WHEN EXISTS (SELECT 1 FROM public.profiles WHERE email = 'devzoratech@gmail.com') 
+    WHEN EXISTS (SELECT 1 FROM public.profiles WHERE email = 'kevouganda7@gmail.com') 
     THEN 'Admin profile exists in public.profiles'
     ELSE 'Admin profile missing from public.profiles'
   END as status;
